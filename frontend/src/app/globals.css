@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 15 23 42;
+    --surface: 30 41 59;
+    --surface-2: 51 65 85;
+    --border: 71 85 105;
+    --text-primary: 241 245 249;
+    --text-secondary: 148 163 184;
+    --healthy: 34 197 94;
+    --warning: 245 158 11;
+    --at-risk: 249 115 22;
+    --critical: 239 68 68;
+    --offline: 107 114 128;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    background-color: #0f172a;
+    color: #f1f5f9;
+  }
+
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #1e293b; }
+  ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+}
+
+@layer components {
+  .status-healthy { @apply text-green-400 bg-green-400/10 border-green-400/30; }
+  .status-warning { @apply text-yellow-400 bg-yellow-400/10 border-yellow-400/30; }
+  .status-at-risk { @apply text-orange-400 bg-orange-400/10 border-orange-400/30; }
+  .status-critical { @apply text-red-400 bg-red-400/10 border-red-400/30; }
+  .status-offline  { @apply text-gray-400 bg-gray-400/10 border-gray-400/30; }
+  .status-unknown  { @apply text-slate-400 bg-slate-400/10 border-slate-400/30; }
+
+  .card {
+    @apply bg-surface border border-surface-2 rounded-xl p-4;
+  }
+
+  /* Glassmorphism panel for the Live Lab NOC dashboard */
+  .glass-card {
+    background: rgba(30, 41, 59, 0.55);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 0.875rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    @apply p-4;
+  }
+
+  /* Heartbeat flatline pulse for stale servers */
+  @keyframes flatline-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .hb-stale { animation: flatline-blink 1.5s ease-in-out infinite; }
+
+  .metric-value {
+    @apply text-2xl font-bold tabular-nums;
+  }
+
+  .metric-label {
+    @apply text-xs text-text-secondary uppercase tracking-wider;
+  }
+
+  /* Animated pulse dot for live indicators */
+  .live-dot {
+    @apply inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse;
+  }
+}

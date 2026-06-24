@@ -1,0 +1,91 @@
+[tool.poetry]
+name = "amd-fleet-monitor-backend"
+version = "1.0.0"
+description = "AMD Server Fleet Observability Platform - Backend"
+authors = ["AMD Infrastructure Team"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+# Web Framework
+fastapi = "^0.111.0"
+uvicorn = {extras = ["standard"], version = "^0.30.0"}
+websockets = "^12.0"
+
+# Database
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.30"}
+asyncpg = "^0.29.0"
+alembic = "^1.13.0"
+psycopg2-binary = "^2.9.9"
+
+# Redis & Celery
+redis = {extras = ["hiredis"], version = "^5.0.6"}
+celery = {extras = ["redis"], version = "^5.4.0"}
+
+# HTTP Client (Redfish)
+httpx = {extras = ["http2"], version = "^0.27.0"}
+aiohttp = "^3.9.5"
+
+# Pydantic
+pydantic = "^2.7.0"
+pydantic-settings = "^2.3.0"
+
+# IPMI
+python-ipmi = "^0.5.4"
+
+# SSH OS Agent
+asyncssh = "^2.14.2"
+
+# SNMP
+pysnmp = "^6.2.5"
+
+# Authentication
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-multipart = "^0.0.9"
+
+# Utilities
+python-dateutil = "^2.9.0"
+pytz = "^2024.1"
+schedule = "^1.2.2"
+tenacity = "^8.3.0"
+structlog = "^24.2.0"
+prometheus-client = "^0.20.0"
+
+# Alerting
+aiosmtplib = "^3.0.1"
+slack-sdk = "^3.29.0"
+pymsteams = "^0.2.2"
+
+# ML / Predictive
+scikit-learn = "^1.5.0"
+numpy = "^1.26.4"
+pandas = "^2.2.2"
+
+# Crypto (for Vault integration)
+cryptography = "^42.0.8"
+hvac = "^2.3.0"
+
+# Reporting
+reportlab = "^4.2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+pytest-asyncio = "^0.23.7"
+httpx = "^0.27.0"
+factory-boy = "^3.3.0"
+black = "^24.4.2"
+ruff = "^0.4.9"
+mypy = "^1.10.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true

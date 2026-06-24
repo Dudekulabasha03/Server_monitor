@@ -1,0 +1,109 @@
+services:
+
+  # ── Backend API — 4 workers, reads live data via PgBouncer ────────────────
+  backend-rbac:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fleetmon-rbac-backend
+    restart: unless-stopped
+    ports:
+      - "8200:8200"
+    networks:
+      - default
+      - prod        # reach fleetmon-redis, fleetmon-vm on prod network
+      - ai          # reach fleetmon-ai-backend for AI endpoints
+    environment:
+      # Live prod data — direct to prod postgres with SQLAlchemy pool (pool_size=30 handles 50-200 users)
+      DATABASE_URL: postgresql+asyncpg://fleetmon:fleetmon_amd_2026@fleetmon-postgres:5432/fleetmon
+      # Celery/session cache — use prod Redis (already keeps all queue state)
+      REDIS_URL: redis://fleetmon-redis:6379/0
+      # Time-series — use prod VictoriaMetrics
+      VICTORIA_METRICS_URL: http://fleetmon-vm:8428
+      VICTORIA_METRICS_WRITE_URL: http://fleetmon-vm:8428/api/v1/import/prometheus
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      DEBUG: "false"
+      ALLOWED_ORIGINS: >-
+        ["http://10.194.168.138:3200","http://10.194.168.138:8080","http://10.194.168.138:8200","http://localhost:3200","http://localhost:8080"]
+      RBAC_ENABLED: "true"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-jwt-secret}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-30}
+      RBAC_SUPER_ADMIN_EMAIL: ${RBAC_SUPER_ADMIN_EMAIL:-admin@amd.com}
+      RBAC_SUPER_ADMIN_PASSWORD: ${RBAC_SUPER_ADMIN_PASSWORD:-ChangeMe123!}
+      RBAC_SUPER_ADMIN_NAME: ${RBAC_SUPER_ADMIN_NAME:-System Administrator}
+      PRISM_ENABLED: "true"
+      PRISM_URL: https://prism.amd.com/os-provisioning-api
+      PRISM_USER: Z1_TSP_TEAM
+      PRISM_PASSWORD: "Amazing#April@2026@"
+      PRISM_API_KEY: YTFfY2VtZV9jaWNkdXNlcjpMdW5Cb3dvdzkwenpPNmMw
+      PIPT_ENABLED: "true"
+      PIPT_URL: http://tsp-dogmatix-blr.amd.com:8787
+      # AI stack — forward AI requests to fleetmon-ai-backend via nginx
+      # The sidebar checks /api/v1/ai/health; nginx proxies it to the AI backend
+      AI_ENABLED: "true"
+      AI_BASE_URL: https://llm-api.amd.com/api/v1
+      AI_MODEL: Claude-Opus-4.6
+      AI_SUBSCRIPTION_KEY: ${AI_SUBSCRIPTION_KEY:-2485ac6d2e0e47a2980b7d656a86b132}
+      AI_TIMEOUT: "90"
+      AI_MAX_TOKENS: "8000"
+      AI_TEMPERATURE: "0.2"
+      AI_MAX_REACT_STEPS: "5"
+      # Connection pool tuned for 50-200 users (4 workers × pool_size=8 = 32 max connections)
+      DATABASE_POOL_SIZE: "8"
+      DATABASE_MAX_OVERFLOW: "8"
+      # Disable collection — prod worker handles this
+      COLLECT_INTERVAL_REDFISH: "999999"
+      COLLECT_INTERVAL_IPMI: "999999"
+      COLLECT_INTERVAL_OS_AGENT: "999999"
+      DISCOVERY_SCAN_INTERVAL: "999999"
+      SEL_AUTOTRIAGE_ENABLED: "false"
+      BIOS_API_URL: ${BIOS_API_URL:-http://10.194.168.138:5005}
+      DEFAULT_OS_USERNAME: amd
+      DEFAULT_OS_PASSWORD: amd123
+    depends_on: []
+    # 4 workers — sweet spot for 50-200 concurrent users on this server
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8200 --workers 4
+
+  # ── Frontend — production Next.js node server ─────────────────────────────
+  frontend-rbac:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://10.194.168.138:8200
+    container_name: fleetmon-rbac-frontend
+    restart: unless-stopped
+    ports:
+      - "3200:3000"
+    depends_on:
+      - backend-rbac
+    environment:
+      NEXT_PUBLIC_API_URL: http://10.194.168.138:8200
+      NODE_ENV: production
+
+  # ── Nginx — unified reverse proxy ─────────────────────────────────────────
+  nginx-rbac:
+    image: nginx:1.27-alpine
+    container_name: fleetmon-rbac-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./deploy/nginx/nginx-rbac.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - default
+      - ai          # reach fleetmon-ai-backend for /api/v1/ai/* routing
+    depends_on:
+      - frontend-rbac
+      - backend-rbac
+
+networks:
+  default:
+    name: fleetmon-rbac-network
+  prod:
+    name: fleetmon-network       # prod stack network (postgres, redis, vm)
+    external: true
+  ai:
+    name: fleetmon-ai-network    # AI stack network (ai-backend for copilot)
+    external: true

@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EPDW Executive Analytics Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<style>
+  :root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #0f1629;
+    --bg-card: #131d35;
+    --bg-card-hover: #1a2540;
+    --bg-sidebar: #0c1220;
+    --border-color: rgba(99,179,237,0.12);
+    --border-active: rgba(99,179,237,0.35);
+    --text-primary: #e8f0fe;
+    --text-secondary: #8ba3cc;
+    --text-muted: #4a6080;
+    --accent-blue: #4f9eff;
+    --accent-purple: #8b5cf6;
+    --accent-teal: #14b8a6;
+    --accent-green: #10d98a;
+    --accent-orange: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-pink: #ec4899;
+    --accent-indigo: #6366f1;
+    --gradient-blue: linear-gradient(135deg, #1e3a8a, #3b82f6);
+    --gradient-purple: linear-gradient(135deg, #4c1d95, #8b5cf6);
+    --gradient-teal: linear-gradient(135deg, #134e4a, #14b8a6);
+    --gradient-green: linear-gradient(135deg, #064e3b, #10d98a);
+    --gradient-orange: linear-gradient(135deg, #78350f, #f59e0b);
+    --gradient-indigo: linear-gradient(135deg, #312e81, #6366f1);
+    --shadow-card: 0 4px 24px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
+    --shadow-glow-blue: 0 0 20px rgba(79,158,255,0.15);
+    --shadow-glow-purple: 0 0 20px rgba(139,92,246,0.15);
+    --shadow-glow-teal: 0 0 20px rgba(20,184,166,0.15);
+    --radius-card: 14px;
+    --radius-sm: 8px;
+    --sidebar-width: 220px;
+    --header-height: 64px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: var(--sidebar-width);
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-color);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+
+  .sidebar-logo {
+    padding: 18px 20px 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 34px; height: 34px;
+    background: var(--gradient-blue);
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    box-shadow: var(--shadow-glow-blue);
+  }
+
+  .logo-text { font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+  .logo-sub  { font-size: 10px; color: var(--text-muted); font-weight: 400; }
+
+  .sidebar-nav { padding: 12px 10px; flex: 1; overflow-y: auto; }
+  .nav-section-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+    color: var(--text-muted); text-transform: uppercase;
+    padding: 10px 10px 6px;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: var(--radius-sm);
+    cursor: pointer; transition: all 0.2s; margin-bottom: 2px;
+    color: var(--text-secondary); font-size: 13px; font-weight: 500;
+    text-decoration: none;
+  }
+
+  .nav-item:hover { background: rgba(79,158,255,0.08); color: var(--text-primary); }
+  .nav-item.active {
+    background: rgba(79,158,255,0.15);
+    color: var(--accent-blue);
+    border-left: 3px solid var(--accent-blue);
+  }
+
+  .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto;
+    background: var(--accent-blue);
+    color: #fff; font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 10px;
+  }
+
+  .sidebar-footer {
+    padding: 14px 20px; border-top: 1px solid var(--border-color);
+    font-size: 11px; color: var(--text-muted);
+  }
+  .status-dot {
+    display: inline-block; width: 7px; height: 7px;
+    background: var(--accent-green); border-radius: 50%;
+    margin-right: 6px; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ─── MAIN LAYOUT ─── */
+  .main-wrapper {
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+  }
+
+  /* ─── HEADER ─── */
+  .header {
+    height: var(--header-height);
+    background: rgba(15,22,41,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+    display: flex; align-items: center;
+    padding: 0 24px; gap: 12px;
+    position: sticky; top: 0; z-index: 50;
+  }
+
+  .header-title-block { flex-shrink: 0; margin-right: 8px; }
+  .header-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+  .header-subtitle { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+  .header-divider { width: 1px; height: 28px; background: var(--border-color); flex-shrink: 0; }
+
+  .filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
+
+  .filter-label { font-size: 10px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+
+  .filter-select, .filter-input {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 5px 10px; font-size: 12px;
+    outline: none; cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .filter-select:focus, .filter-input:focus { border-color: var(--accent-blue); }
+  .filter-select { appearance: none; padding-right: 24px; position: relative; }
+
+  .filter-btn {
+    background: var(--gradient-blue);
+    border: none; color: #fff;
+    padding: 6px 14px; border-radius: var(--radius-sm);
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.2s; white-space: nowrap;
+  }
+  .filter-btn:hover { opacity: 0.85; }
+
+  .search-box {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); padding: 5px 10px;
+    transition: border-color 0.2s;
+  }
+  .search-box:focus-within { border-color: var(--accent-blue); }
+  .search-icon { color: var(--text-muted); font-size: 12px; }
+  .search-input { background: none; border: none; color: var(--text-primary); outline: none; font-size: 12px; width: 130px; }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  .header-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
+  .action-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary); padding: 6px 12px;
+    border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .action-btn:hover { background: rgba(79,158,255,0.1); color: var(--accent-blue); border-color: var(--accent-blue); }
+
+  /* ─── CONTENT ─── */
+  .content { padding: 20px 24px; flex: 1; }
+
+  /* ─── SECTION HEADER ─── */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; margin-top: 6px;
+  }
+  .section-title {
+    font-size: 13px; font-weight: 700; color: var(--text-primary);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::before {
+    content: ''; display: block;
+    width: 3px; height: 16px;
+    background: var(--gradient-blue); border-radius: 2px;
+  }
+  .section-meta { font-size: 11px; color: var(--text-muted); }
+
+  /* ─── KPI CARDS ─── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 14px; margin-bottom: 20px;
+  }
+
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    padding: 18px 16px;
+    position: relative; overflow: hidden;
+    box-shadow: var(--shadow-card);
+    transition: all 0.25s; cursor: pointer;
+  }
+  .kpi-card:hover {
+    border-color: var(--border-active);
+    box-shadow: var(--shadow-card), var(--shadow-glow-blue);
+    transform: translateY(-2px);
+  }
+  .kpi-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+  }
+  .kpi-card.blue::before   { background: var(--gradient-blue); }
+  .kpi-card.purple::before { background: var(--gradient-purple); }
+  .kpi-card.teal::before   { background: var(--gradient-teal); }
+  .kpi-card.green::before  { background: var(--gradient-green); }
+  .kpi-card.orange::before { background: var(--gradient-orange); }
+  .kpi-card.indigo::before { background: var(--gradient-indigo); }
+
+  .kpi-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+  .kpi-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .kpi-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .kpi-icon.blue   { background: rgba(79,158,255,0.15); }
+  .kpi-icon.purple { background: rgba(139,92,246,0.15); }
+  .kpi-icon.teal   { background: rgba(20,184,166,0.15); }
+  .kpi-icon.green  { background: rgba(16,217,138,0.15); }
+  .kpi-icon.orange { background: rgba(245,158,11,0.15); }
+  .kpi-icon.indigo { background: rgba(99,102,241,0.15); }
+
+  .kpi-value {
+    font-size: 26px; font-weight: 800; line-height: 1;
+    letter-spacing: -0.5px; margin-bottom: 8px;
+  }
+  .kpi-card.blue   .kpi-value { color: var(--accent-blue); }
+  .kpi-card.purple .kpi-value { color: var(--accent-purple); }
+  .kpi-card.teal   .kpi-value { color: var(--accent-teal); }
+  .kpi-card.green  .kpi-value { color: var(--accent-green); }
+  .kpi-card.orange .kpi-value { color: var(--accent-orange); }
+  .kpi-card.indigo .kpi-value { color: var(--accent-indigo); }
+
+  .kpi-footer { display: flex; align-items: center; gap: 6px; }
+  .kpi-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 7px;
+    border-radius: 10px; display: flex; align-items: center; gap: 3px;
+  }
+  .kpi-badge.up   { background: rgba(16,217,138,0.12); color: var(--accent-green); }
+  .kpi-badge.down { background: rgba(239,68,68,0.12);  color: var(--accent-red); }
+  .kpi-badge.neutral { background: rgba(245,158,11,0.12); color: var(--accent-orange); }
+  .kpi-footer-text { font-size: 10px; color: var(--text-muted); }
+
+  .kpi-sparkline { position: absolute; bottom: 0; right: 0; opacity: 0.18; }
+
+  /* ─── CHARTS GRID ─── */
+  .charts-row { display: grid; gap: 14px; margin-bottom: 14px; }
+  .charts-row-2 { grid-template-columns: 1.4fr 1fr; }
+  .charts-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .charts-row-22 { grid-template-columns: 1.2fr 0.8fr 1fr; }
+
+  .chart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    padding: 18px;
+    box-shadow: var(--shadow-card);
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .chart-card:hover { border-color: var(--border-active); }
+
+  .chart-card-header {
+    display: flex; align-items: flex-start;
+    justify-content: space-between; margin-bottom: 16px;
+  }
+  .chart-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+  .chart-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .chart-controls { display: flex; gap: 6px; align-items: center; }
+  .chart-pill {
+    font-size: 10px; padding: 3px 9px; border-radius: 12px;
+    border: 1px solid var(--border-color); color: var(--text-muted);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .chart-pill.active, .chart-pill:hover {
+    border-color: var(--accent-blue); color: var(--accent-blue);
+    background: rgba(79,158,255,0.08);
+  }
+  .chart-menu-btn {
+    background: none; border: 1px solid var(--border-color);
+    color: var(--text-muted); width: 26px; height: 26px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; transition: all 0.2s;
+  }
+  .chart-menu-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+  .chart-body { position: relative; }
+
+  /* ─── GAUGE ─── */
+  .gauge-container {
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; padding: 10px 0;
+  }
+  .gauge-wrap { position: relative; width: 180px; height: 100px; }
+  .gauge-center-text {
+    position: absolute; bottom: -4px; left: 0; right: 0;
+    text-align: center;
+  }
+  .gauge-pct { font-size: 28px; font-weight: 800; color: var(--accent-orange); }
+  .gauge-label { font-size: 11px; color: var(--text-muted); }
+  .gauge-target {
+    display: flex; align-items: center; gap: 6px; margin-top: 14px;
+    background: rgba(255,255,255,0.04); border-radius: 8px; padding: 8px 16px;
+    border: 1px solid var(--border-color);
+  }
+  .gauge-target-label { font-size: 11px; color: var(--text-muted); }
+  .gauge-target-val { font-size: 13px; font-weight: 700; color: var(--accent-green); }
+  .gauge-ticks { display: flex; justify-content: space-between; width: 180px; margin-top: 4px; }
+  .gauge-tick-val { font-size: 10px; color: var(--text-muted); }
+
+  /* ─── LEGEND ─── */
+  .chart-legend {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    margin-top: 12px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--text-secondary);
+  }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .legend-line { width: 18px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ─── ADVANCED SECTION ─── */
+  .advanced-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr 1.1fr;
+    gap: 14px; margin-bottom: 14px;
+  }
+
+  /* ─── RADAR ─── */
+  .radar-scores {
+    display: flex; flex-direction: column; gap: 7px; margin-top: 10px;
+  }
+  .radar-score-item {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .radar-score-label { font-size: 10px; color: var(--text-muted); width: 130px; flex-shrink: 0; }
+  .radar-bar-track { flex: 1; height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; }
+  .radar-bar-fill { height: 100%; border-radius: 3px; transition: width 1s; }
+  .radar-score-pct { font-size: 10px; font-weight: 700; width: 32px; text-align: right; }
+
+  /* ─── HEATMAP ─── */
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: 100px repeat(12, 1fr);
+    gap: 3px; font-size: 9px;
+    margin-top: 4px;
+  }
+  .heatmap-header { color: var(--text-muted); text-align: center; padding: 3px 0; font-weight: 600; }
+  .heatmap-row-label { color: var(--text-secondary); display: flex; align-items: center; font-size: 10px; }
+  .heatmap-cell {
+    height: 22px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.7);
+    cursor: pointer; transition: transform 0.15s;
+  }
+  .heatmap-cell:hover { transform: scale(1.15); z-index: 2; position: relative; }
+
+  /* ─── MATRIX TABLE ─── */
+  .matrix-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  .matrix-table th {
+    font-size: 10px; font-weight: 700; color: var(--text-muted);
+    text-align: left; padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .matrix-table td { padding: 9px 10px; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .matrix-table tr:last-child td { border-bottom: none; }
+  .matrix-table tr:hover td { background: rgba(79,158,255,0.04); }
+  .matrix-table .year-col { color: var(--text-muted); font-weight: 600; font-size: 11px; }
+  .matrix-table .num-col { font-weight: 700; color: var(--text-primary); }
+  .growth-up   { color: var(--accent-green); font-size: 10px; font-weight: 700; }
+  .growth-down { color: var(--accent-red);   font-size: 10px; font-weight: 700; }
+
+  .cell-bar {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .cell-mini-bar {
+    height: 5px; border-radius: 3px; display: inline-block;
+  }
+
+  /* ─── INSIGHTS PANEL ─── */
+  .insights-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .insights-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    padding: 18px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .insights-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+  }
+  .insights-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--gradient-purple);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    box-shadow: var(--shadow-glow-purple);
+  }
+  .insights-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+  .insights-subtitle { font-size: 10px; color: var(--text-muted); }
+
+  .insight-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .insight-item:last-child { border-bottom: none; }
+  .insight-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    margin-top: 4px; flex-shrink: 0;
+  }
+  .insight-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .insight-text strong { color: var(--text-primary); }
+
+  /* ─── BENCHMARK TREND ─── */
+  .trend-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    padding: 18px;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(99,179,237,0.2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(99,179,237,0.4); }
+
+  /* ─── TOOLTIP ─── */
+  .tooltip {
+    position: absolute; background: #1a2540;
+    border: 1px solid var(--border-active);
+    border-radius: 8px; padding: 8px 12px;
+    font-size: 11px; color: var(--text-primary);
+    pointer-events: none; z-index: 999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: none;
+  }
+
+  /* ─── BOTTOM BAR ─── */
+  .bottom-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 24px;
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-color);
+    font-size: 10px; color: var(--text-muted);
+  }
+  .bottom-bar-right { display: flex; gap: 16px; align-items: center; }
+  .bottom-bar-tag {
+    padding: 2px 8px; border-radius: 6px;
+    background: rgba(79,158,255,0.1); color: var(--accent-blue);
+    font-weight: 600;
+  }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 1400px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .charts-row-22 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 1100px) {
+    :root { --sidebar-width: 0px; }
+    .sidebar { display: none; }
+    .charts-row-2, .charts-row-3 { grid-template-columns: 1fr; }
+    .advanced-grid { grid-template-columns: 1fr; }
+    .insights-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 768px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .content { padding: 14px; }
+  }
+
+  /* ─── ANIMATED GRADIENT BG ─── */
+  .bg-glow {
+    position: fixed; pointer-events: none; z-index: 0;
+    border-radius: 50%; filter: blur(80px); opacity: 0.04;
+  }
+  .bg-glow-1 { width: 600px; height: 600px; background: var(--accent-blue); top: -100px; right: -100px; }
+  .bg-glow-2 { width: 400px; height: 400px; background: var(--accent-purple); bottom: 100px; left: 100px; }
+  .bg-glow-3 { width: 300px; height: 300px; background: var(--accent-teal); top: 40%; right: 30%; }
+
+  /* ─── DATA SOURCE LEGEND ITEMS ─── */
+  .source-legend { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+  .source-item { display: flex; align-items: center; gap: 8px; }
+  .source-bar-wrap { flex: 1; }
+  .source-bar-track { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; }
+  .source-bar-fill { height: 100%; border-radius: 3px; }
+  .source-name { font-size: 10px; color: var(--text-secondary); width: 130px; flex-shrink: 0; }
+  .source-val  { font-size: 10px; font-weight: 700; width: 50px; text-align: right; }
+
+  /* Glassy overlay for cards */
+  .chart-card::after, .kpi-card::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.015) 0%, transparent 60%);
+    pointer-events: none; border-radius: inherit;
+  }
+
+  /* ─── TOAST NOTIFICATION ─── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #1a2540;
+    border: 1px solid var(--border-active);
+    border-radius: 10px; padding: 12px 18px;
+    font-size: 12px; color: var(--text-primary);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    z-index: 9999; display: flex; align-items: center; gap: 10px;
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    pointer-events: none; max-width: 340px;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+  #toast .toast-icon { font-size: 16px; flex-shrink: 0; }
+  #toast .toast-msg { flex: 1; line-height: 1.4; }
+  #toast .toast-close {
+    cursor: pointer; color: var(--text-muted);
+    font-size: 14px; flex-shrink: 0; margin-left: 4px;
+  }
+  #toast.toast-success { border-color: rgba(16,217,138,0.4); }
+  #toast.toast-info    { border-color: rgba(79,158,255,0.4); }
+  #toast.toast-warn    { border-color: rgba(245,158,11,0.4); }
+
+  /* ─── FILTER ACTIVE CHIP ─── */
+  .active-filters-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 24px 0; flex-wrap: wrap;
+  }
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(79,158,255,0.1);
+    border: 1px solid rgba(79,158,255,0.25);
+    color: var(--accent-blue); border-radius: 20px;
+    font-size: 10px; font-weight: 600; padding: 3px 10px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .filter-chip:hover { background: rgba(79,158,255,0.2); }
+  .filter-chip .chip-x { font-size: 11px; margin-left: 2px; }
+
+  /* ─── SEARCH HIGHLIGHT ─── */
+  .search-highlight { background: rgba(245,158,11,0.25); border-radius: 2px; }
+
+  /* ─── KPI TRANSITION ─── */
+  .kpi-value { transition: all 0.35s ease; }
+  .kpi-value.updating { transform: scale(0.92); opacity: 0.4; }
+
+  /* ─── DRILL PANEL ─── */
+  #drillPanel {
+    position: fixed; right: 0; top: 0; bottom: 0;
+    width: 360px; background: var(--bg-sidebar);
+    border-left: 1px solid var(--border-active);
+    z-index: 200; padding: 24px 20px;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    overflow-y: auto;
+  }
+  #drillPanel.open { transform: translateX(0); }
+  .drill-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 199; display: none;
+  }
+  .drill-overlay.show { display: block; }
+  .drill-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .drill-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+  .drill-close {
+    background: none; border: 1px solid var(--border-color);
+    color: var(--text-muted); width: 28px; height: 28px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    font-size: 14px; display: flex; align-items: center; justify-content: center;
+  }
+  .drill-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 12px;
+  }
+  .drill-row:last-child { border-bottom: none; }
+  .drill-row-label { color: var(--text-secondary); }
+  .drill-row-val { font-weight: 700; color: var(--text-primary); }
+</style>
+</head>
+<body>
+
+<!-- Background glows -->
+<div class="bg-glow bg-glow-1"></div>
+<div class="bg-glow bg-glow-2"></div>
+<div class="bg-glow bg-glow-3"></div>
+
+<!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">⬡</div>
+    <div>
+      <div class="logo-text">EPDW</div>
+      <div class="logo-sub">Analytics Platform</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <a class="nav-item active" href="#">
+      <span class="nav-icon">▦</span> Overview
+      <span class="nav-badge">Live</span>
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">⛁</span> Data Sources
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">▷</span> Benchmark Executions
+    </a>
+
+    <div class="nav-section-label" style="margin-top:8px">Analytics</div>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">⚡</span> Automation Analytics
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">📈</span> Trends
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">✦</span> Data Quality
+    </a>
+
+    <div class="nav-section-label" style="margin-top:8px">Reports</div>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">📋</span> Detailed Reports
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">⬇</span> Export Center
+    </a>
+
+    <div class="nav-section-label" style="margin-top:8px">System</div>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">⚙</span> Settings
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <span class="status-dot"></span>Live · Last sync 2 min ago<br>
+    <span style="color:var(--text-muted);margin-top:4px;display:block">v3.1.0 · June 2026</span>
+  </div>
+</aside>
+
+<!-- ═══════════════════ MAIN ═══════════════════ -->
+<div class="main-wrapper">
+
+  <!-- ─── HEADER ─── -->
+  <header class="header">
+    <div class="header-title-block">
+      <div class="header-title">EPDW Executive Analytics</div>
+      <div class="header-subtitle">Benchmark Execution · Data Source Analytics · Automation Insights · Historical Trends</div>
+    </div>
+    <div class="header-divider"></div>
+
+    <div class="filter-group">
+      <span class="filter-label">Year</span>
+      <select class="filter-select" id="yearFilter">
+        <option value="all">All Years</option>
+        <option value="2022">2022</option>
+        <option value="2023">2023</option>
+        <option value="2024">2024</option>
+        <option value="2025">2025</option>
+        <option value="2026" selected>2026 YTD</option>
+      </select>
+
+      <span class="filter-label">Execution</span>
+      <select class="filter-select" id="execFilter">
+        <option value="all">All Types</option>
+        <option value="manual">Manual</option>
+        <option value="automated">Automated</option>
+      </select>
+
+      <span class="filter-label">Source</span>
+      <select class="filter-select" id="sourceFilter">
+        <option value="all">All Sources</option>
+        <option value="DEAE Manual Execution">DEAE Manual Execution</option>
+        <option value="SPEC.org">SPEC.org</option>
+        <option value="OpenBenchmarking Phoronix">OpenBenchmarking Phoronix</option>
+        <option value="EPP">EPP</option>
+        <option value="Azure">Azure</option>
+        <option value="JET">JET</option>
+        <option value="SIT">SIT</option>
+        <option value="OCI">OCI</option>
+        <option value="Red Hat">Red Hat</option>
+      </select>
+
+      <span class="filter-label">From</span>
+      <input type="date" class="filter-input" id="dateFrom" value="2026-01-01" style="width:130px">
+      <span class="filter-label">To</span>
+      <input type="date" class="filter-input" id="dateTo" value="2026-06-16" style="width:130px">
+
+      <button class="filter-btn" id="applyBtn" onclick="applyFilters()">&#9654; Apply</button>
+      <button class="filter-btn" id="resetBtn" onclick="resetFilters()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border-color);color:var(--text-secondary)">&#8635; Reset</button>
+    </div>
+
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="searchInput" type="text" placeholder="Search benchmarks, sources…" oninput="handleSearch(this.value)">
+      <span id="searchClear" style="cursor:pointer;color:var(--text-muted);font-size:12px;display:none" onclick="clearSearch()">✕</span>
+    </div>
+
+    <div class="header-actions">
+      <button class="action-btn" id="filterIndicator" style="display:none;background:rgba(79,158,255,0.12);color:var(--accent-blue);border-color:var(--accent-blue)">
+        ◈ Filtered
+      </button>
+      <button class="action-btn" onclick="exportCSV()">⬇ CSV</button>
+      <button class="action-btn" onclick="exportPDF()">⬇ PDF</button>
+      <button class="action-btn" onclick="showShareToast()">⬗ Share</button>
+    </div>
+  </header>
+
+  <!-- ─── CONTENT ─── -->
+  <div class="content">
+
+    <!-- KPI CARDS -->
+    <div class="section-header">
+      <div class="section-title">Key Performance Indicators</div>
+      <div class="section-meta">YTD 2026 · All Sources · Refreshed 2 min ago</div>
+    </div>
+
+    <div class="kpi-grid">
+      <!-- Card 1 -->
+      <div class="kpi-card blue" onclick="drillDown('records')">
+        <div class="kpi-card-top">
+          <div class="kpi-label">Total Records</div>
+          <div class="kpi-icon blue">⛁</div>
+        </div>
+        <div class="kpi-value">218,570</div>
+        <div class="kpi-footer">
+          <span class="kpi-badge up">▲ 31.2%</span>
+          <span class="kpi-footer-text">vs 2024</span>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="kpi-card purple" onclick="drillDown('executions')">
+        <div class="kpi-card-top">
+          <div class="kpi-label">Total Executions</div>
+          <div class="kpi-icon purple">▷</div>
+        </div>
+        <div class="kpi-value">18,900</div>
+        <div class="kpi-footer">
+          <span class="kpi-badge up">▲ 18.7%</span>
+          <span class="kpi-footer-text">vs 2024</span>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="kpi-card teal" onclick="drillDown('iterations')">
+        <div class="kpi-card-top">
+          <div class="kpi-label">Total Iterations</div>
+          <div class="kpi-icon teal">↻</div>
+        </div>
+        <div class="kpi-value">66,231</div>
+        <div class="kpi-footer">
+          <span class="kpi-badge up">▲ 22.4%</span>
+          <span class="kpi-footer-text">vs 2024</span>
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="kpi-card green" onclick="drillDown('automation')">
+        <div class="kpi-card-top">
+          <div class="kpi-label">Automation %</div>
+          <div class="kpi-icon green">⚡</div>
+        </div>
+        <div class="kpi-value">54.81%</div>
+        <div class="kpi-footer">
+          <span class="kpi-badge up">▲ 9.2 pp</span>
+          <span class="kpi-footer-text">from 45.6% in 2024</span>
+        </div>
+      </div>
+
+      <!-- Card 5 -->
+      <div class="kpi-card orange" onclick="drillDown('sources')">
+        <div class="kpi-card-top">
+          <div class="kpi-label">Data Sources</div>
+          <div class="kpi-icon orange">⛁</div>
+        </div>
+        <div class="kpi-value">13</div>
+        <div class="kpi-footer">
+          <span class="kpi-badge up">▲ 2 new</span>
+          <span class="kpi-footer-text">added in 2025</span>
+        </div>
+      </div>
+
+      <!-- Card 6 -->
+      <div class="kpi-card indigo" onclick="drillDown('quality')">
+        <div class="kpi-card-top">
+          <div class="kpi-label">Data Quality Score</div>
+          <div class="kpi-icon indigo">✦</div>
+        </div>
+        <div class="kpi-value">95%</div>
+        <div class="kpi-footer">
+          <span class="kpi-badge up">▲ 2.1%</span>
+          <span class="kpi-footer-text">above enterprise threshold</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW 1: Horizontal Bar + Multi-Line Trend -->
+    <div class="charts-row charts-row-2">
+
+      <!-- Visual 1: Records by Data Source -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-title">Records by Data Source</div>
+            <div class="chart-subtitle">Sorted descending · Click bar to drill down</div>
+          </div>
+          <div class="chart-controls">
+            <span class="chart-pill active">Records</span>
+            <span class="chart-pill">%</span>
+            <button class="chart-menu-btn" title="More options">⋯</button>
+          </div>
+        </div>
+        <div class="chart-body" style="height:260px">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Visual 2: Executions vs Iterations Trend -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-title">Executions vs Iterations Trend</div>
+            <div class="chart-subtitle">Multi-line · Includes 2026 forecast</div>
+          </div>
+          <div class="chart-controls">
+            <span class="chart-pill active">Yearly</span>
+            <span class="chart-pill">QoQ</span>
+            <button class="chart-menu-btn">⋯</button>
+          </div>
+        </div>
+        <div class="chart-body" style="height:210px">
+          <canvas id="lineChart"></canvas>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-line" style="background:var(--accent-blue)"></div> Executions</div>
+          <div class="legend-item"><div class="legend-line" style="background:var(--accent-teal)"></div> Iterations</div>
+          <div class="legend-item"><div class="legend-line" style="background:rgba(79,158,255,0.35);border-top:2px dashed var(--accent-blue)"></div> Forecast</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW 2: Donut (by year) + Stacked Bar + Gauge -->
+    <div class="charts-row charts-row-22">
+
+      <!-- Visual 3: Automated Records Distribution -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-title">Automated Records Distribution</div>
+            <div class="chart-subtitle">Automated records by year · 2022–2026 YTD</div>
+          </div>
+          <div class="chart-controls">
+            <button class="chart-menu-btn">⋯</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center">
+          <div style="position:relative;height:200px">
+            <canvas id="donutYearChart"></canvas>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
+              <div style="font-size:20px;font-weight:800;color:var(--text-primary)">119,813</div>
+              <div style="font-size:10px;color:var(--text-muted)">Total Auto</div>
+            </div>
+          </div>
+          <div class="chart-legend" style="flex-direction:column;gap:8px">
+            <div class="legend-item"><div class="legend-dot" style="background:#4f9eff"></div><span>2022 &nbsp;3.4%</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div><span>2023 &nbsp;11.8%</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#14b8a6"></div><span>2024 &nbsp;26.5%</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#10d98a"></div><span>2025 &nbsp;42.9%</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div><span>2026 YTD 15.4%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visual 4: Manual vs Automated Records -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-title">Manual vs Automated Records</div>
+            <div class="chart-subtitle">Stacked by year</div>
+          </div>
+          <div class="chart-controls">
+            <button class="chart-menu-btn">⋯</button>
+          </div>
+        </div>
+        <div class="chart-body" style="height:220px">
+          <canvas id="stackedBarChart"></canvas>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--accent-blue)"></div> Automated</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(79,158,255,0.25)"></div> Manual</div>
+        </div>
+      </div>
+
+      <!-- Visual 5: Automation % Gauge -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-title">Automation Rate</div>
+            <div class="chart-subtitle">Current vs Target</div>
+          </div>
+          <div class="chart-controls">
+            <button class="chart-menu-btn">⋯</button>
+          </div>
+        </div>
+        <div class="gauge-container">
+          <div class="gauge-wrap">
+            <canvas id="gaugeChart" width="180" height="120"></canvas>
+            <div class="gauge-center-text">
+              <div class="gauge-pct">54.81%</div>
+              <div class="gauge-label">Current Rate</div>
+            </div>
+          </div>
+          <div class="gauge-ticks">
+            <span class="gauge-tick-val">0%</span>
+            <span class="gauge-tick-val">25%</span>
+            <span class="gauge-tick-val">50%</span>
+            <span class="gauge-tick-val">75%</span>
+            <span class="gauge-tick-val">100%</span>
+          </div>
+          <div class="gauge-target">
+            <span class="gauge-target-label">Target:</span>
+            <span class="gauge-target-val">80%</span>
+            <span class="gauge-target-label" style="margin-left:8px">Gap:</span>
+            <span style="color:var(--accent-orange);font-size:13px;font-weight:700">−25.19 pp</span>
+          </div>
+          <!-- Threshold legend -->
+          <div style="display:flex;gap:10px;margin-top:10px">
+            <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div><span style="font-size:10px">0–40 Low</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div><span style="font-size:10px">40–70 Mid</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#10d98a"></div><span style="font-size:10px">70–100 Target</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW 3: Top 5 Sources Donut + Automation Maturity Radar -->
+    <div class="charts-row charts-row-2">
+
+      <!-- Visual 6: Top 5 Sources -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-title">Top 5 Data Sources Contribution</div>
+            <div class="chart-subtitle">Percentage of total records · Others grouped</div>
+          </div>
+          <div class="chart-controls">
+            <span class="chart-pill active">% Share</span>
+            <span class="chart-pill">Volume</span>
+            <button class="chart-menu-btn">⋯</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center">
+          <div style="position:relative;height:200px">
+            <canvas id="top5DonutChart"></canvas>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
+              <div style="font-size:16px;font-weight:800;color:var(--text-primary)">Top 5</div>
+              <div style="font-size:10px;color:var(--text-muted)">82.3%</div>
+            </div>
+          </div>
+          <div class="source-legend">
+            <div class="source-item">
+              <span class="source-name">DEAE Manual</span>
+              <div class="source-bar-wrap">
+                <div class="source-bar-track"><div class="source-bar-fill" style="width:78%;background:var(--accent-blue)"></div></div>
+              </div>
+              <span class="source-val" style="color:var(--accent-blue)">31.2%</span>
+            </div>
+            <div class="source-item">
+              <span class="source-name">SPEC.org</span>
+              <div class="source-bar-wrap">
+                <div class="source-bar-track"><div class="source-bar-fill" style="width:61%;background:var(--accent-purple)"></div></div>
+              </div>
+              <span class="source-val" style="color:var(--accent-purple)">24.5%</span>
+            </div>
+            <div class="source-item">
+              <span class="source-name">Phoronix</span>
+              <div class="source-bar-wrap">
+                <div class="source-bar-track"><div class="source-bar-fill" style="width:40%;background:var(--accent-teal)"></div></div>
+              </div>
+              <span class="source-val" style="color:var(--accent-teal)">16.1%</span>
+            </div>
+            <div class="source-item">
+              <span class="source-name">EPP</span>
+              <div class="source-bar-wrap">
+                <div class="source-bar-track"><div class="source-bar-fill" style="width:26%;background:var(--accent-green)"></div></div>
+              </div>
+              <span class="source-val" style="color:var(--accent-green)">10.5%</span>
+            </div>
+            <div class="source-item">
+              <span class="source-name">Azure</span>
+              <div class="source-bar-wrap">
+                <div class="source-bar-track"><div class="source-bar-fill" style="width:0%;background:var(--accent-orange)"></div></div>
+              </div>
+              <span class="source-val" style="color:var(--accent-orange)">0%</span>
+            </div>
+            <div class="source-item">
+              <span class="source-name">Others (8)</span>
+              <div class="source-bar-wrap">
+                <div class="source-bar-track"><div class="source-bar-fill" style="width:43%;background:var(--text-muted)"></div></div>
+              </div>
+              <span class="source-val" style="color:var(--text-muted)">17.7%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Automation Maturity Radar -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-title">Automation Maturity Score</div>
+            <div class="chart-subtitle">Multi-dimensional assessment · 2026 vs 2025</div>
+          </div>
+          <div class="chart-controls">
+            <button class="chart-menu-btn">⋯</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:center">
+          <div style="height:200px">
+            <canvas id="radarChart"></canvas>
+          </div>
+          <div class="radar-scores">
+            <div class="radar-score-item">
+              <span class="radar-score-label">Automation Coverage</span>
+              <div class="radar-bar-track"><div class="radar-bar-fill" style="width:68%;background:var(--accent-blue)"></div></div>
+              <span class="radar-score-pct" style="color:var(--accent-blue)">68%</span>
+            </div>
+            <div class="radar-score-item">
+              <span class="radar-score-label">Execution Success Rate</span>
+              <div class="radar-bar-track"><div class="radar-bar-fill" style="width:91%;background:var(--accent-green)"></div></div>
+              <span class="radar-score-pct" style="color:var(--accent-green)">91%</span>
+            </div>
+            <div class="radar-score-item">
+              <span class="radar-score-label">Benchmark Availability</span>
+              <div class="radar-bar-track"><div class="radar-bar-fill" style="width:78%;background:var(--accent-teal)"></div></div>
+              <span class="radar-score-pct" style="color:var(--accent-teal)">78%</span>
+            </div>
+            <div class="radar-score-item">
+              <span class="radar-score-label">Data Quality</span>
+              <div class="radar-bar-track"><div class="radar-bar-fill" style="width:95%;background:var(--accent-purple)"></div></div>
+              <span class="radar-score-pct" style="color:var(--accent-purple)">95%</span>
+            </div>
+            <div class="radar-score-item">
+              <span class="radar-score-label">Historical Consistency</span>
+              <div class="radar-bar-track"><div class="radar-bar-fill" style="width:83%;background:var(--accent-orange)"></div></div>
+              <span class="radar-score-pct" style="color:var(--accent-orange)">83%</span>
+            </div>
+          </div>
+        </div>
+        <div class="chart-legend" style="margin-top:12px">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--accent-blue);opacity:0.6"></div> 2025 Baseline</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--accent-blue)"></div> 2026 Current</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADVANCED ANALYTICS -->
+    <div class="section-header" style="margin-top:8px">
+      <div class="section-title">Advanced Analytics</div>
+      <div class="section-meta">Execution Heatmap · YoY Matrix · Benchmark Trend</div>
+    </div>
+
+    <div class="advanced-grid">
+
+      <!-- Execution Heatmap -->
+      <div class="chart-card" style="grid-column:1/3">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-title">Benchmark Execution Heatmap</div>
+            <div class="chart-subtitle">Execution volume by benchmark · Monthly · Darker = Higher volume</div>
+          </div>
+          <div class="chart-controls">
+            <span class="chart-pill active">2026</span>
+            <span class="chart-pill">2025</span>
+            <button class="chart-menu-btn">⋯</button>
+          </div>
+        </div>
+        <div id="heatmapGrid" class="heatmap-grid">
+          <!-- Generated by JS -->
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:10px;color:var(--text-muted)">
+          <span>Low</span>
+          <div style="display:flex;gap:2px">
+            <div style="width:14px;height:8px;border-radius:2px;background:rgba(79,158,255,0.1)"></div>
+            <div style="width:14px;height:8px;border-radius:2px;background:rgba(79,158,255,0.25)"></div>
+            <div style="width:14px;height:8px;border-radius:2px;background:rgba(79,158,255,0.45)"></div>
+            <div style="width:14px;height:8px;border-radius:2px;background:rgba(79,158,255,0.65)"></div>
+            <div style="width:14px;height:8px;border-radius:2px;background:rgba(79,158,255,0.85)"></div>
+          </div>
+          <span>High</span>
+        </div>
+      </div>
+
+      <!-- YoY Matrix -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-title">Year-over-Year Growth Matrix</div>
+            <div class="chart-subtitle">Conditional formatting · Growth indicators</div>
+          </div>
+          <div class="chart-controls">
+            <button class="chart-menu-btn">⋯</button>
+          </div>
+        </div>
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Records</th>
+              <th>Executions</th>
+              <th>Iterations</th>
+              <th>Auto %</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="year-col">2022</td>
+              <td class="num-col"><div class="cell-bar">18,240 <div class="cell-mini-bar" style="width:18px;background:var(--accent-blue);opacity:0.5"></div></div></td>
+              <td class="num-col">1,420</td>
+              <td class="num-col">4,980</td>
+              <td>23.1%</td>
+            </tr>
+            <tr>
+              <td class="year-col">2023</td>
+              <td class="num-col"><div class="cell-bar">42,310 <span class="growth-up">▲ 132%</span></div></td>
+              <td class="num-col">3,870 <span class="growth-up">▲</span></td>
+              <td class="num-col">13,560 <span class="growth-up">▲</span></td>
+              <td style="color:var(--accent-green)">31.8%</td>
+            </tr>
+            <tr>
+              <td class="year-col">2024</td>
+              <td class="num-col"><div class="cell-bar">58,900 <span class="growth-up">▲ 39%</span></div></td>
+              <td class="num-col">5,280 <span class="growth-up">▲</span></td>
+              <td class="num-col">18,430 <span class="growth-up">▲</span></td>
+              <td style="color:var(--accent-orange)">45.6%</td>
+            </tr>
+            <tr>
+              <td class="year-col">2025</td>
+              <td class="num-col"><div class="cell-bar">74,810 <span class="growth-up">▲ 27%</span></div></td>
+              <td class="num-col">6,740 <span class="growth-up">▲</span></td>
+              <td class="num-col">21,870 <span class="growth-up">▲</span></td>
+              <td style="color:var(--accent-green)">51.2%</td>
+            </tr>
+            <tr style="background:rgba(79,158,255,0.05)">
+              <td class="year-col" style="color:var(--accent-blue)">2026 YTD</td>
+              <td class="num-col" style="color:var(--accent-blue)"><div class="cell-bar">24,310 <span class="growth-up">▲ proj</span></div></td>
+              <td class="num-col" style="color:var(--accent-blue)">1,590</td>
+              <td class="num-col" style="color:var(--accent-blue)">7,391</td>
+              <td style="color:var(--accent-teal)">54.81%</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:10px;padding:8px 10px;background:rgba(79,158,255,0.04);border-radius:8px;border:1px solid var(--border-color)">
+          <div style="font-size:10px;color:var(--text-muted)">Projected 2026 Full Year (annualized)</div>
+          <div style="font-size:13px;font-weight:700;color:var(--accent-blue);margin-top:3px">~48,620 records · 3,180 executions · 58% automation</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benchmark Trend Full Width -->
+    <div class="trend-card" style="margin-bottom:14px">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-title">Benchmark Trend Analysis</div>
+          <div class="chart-subtitle">Executions · Success Rate · Failures · Monthly performance tracking</div>
+        </div>
+        <div class="chart-controls">
+          <span class="chart-pill active">All Benchmarks</span>
+          <span class="chart-pill">SPEC CPU</span>
+          <span class="chart-pill">Phoronix</span>
+          <button class="chart-menu-btn">⋯</button>
+        </div>
+      </div>
+      <div style="height:220px">
+        <canvas id="benchTrendChart"></canvas>
+      </div>
+      <div class="chart-legend" style="margin-top:12px">
+        <div class="legend-item"><div class="legend-line" style="background:var(--accent-blue)"></div> Executions</div>
+        <div class="legend-item"><div class="legend-line" style="background:var(--accent-green)"></div> Success Rate %</div>
+        <div class="legend-item"><div class="legend-line" style="background:var(--accent-red)"></div> Failures</div>
+      </div>
+    </div>
+
+    <!-- INSIGHTS + AI PANEL -->
+    <div class="section-header" style="margin-top:8px">
+      <div class="section-title">AI-Generated Executive Insights</div>
+      <div class="section-meta">Generated · June 2026</div>
+    </div>
+
+    <div class="insights-grid">
+      <!-- Insights Panel -->
+      <div class="insights-card">
+        <div class="insights-header">
+          <div class="insights-icon">✦</div>
+          <div>
+            <div class="insights-title">Strategic Insights</div>
+            <div class="insights-subtitle">AI-powered · Based on 5-year trend analysis</div>
+          </div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-green)"></div>
+          <div class="insight-text">Total records grew <strong>+31.2%</strong> YoY, reaching 218,570 — highest single-year volume in platform history.</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-teal)"></div>
+          <div class="insight-text">Automation rate improved from <strong>23% (2022) to 54.81% (2026)</strong> — a 138% relative improvement in 4 years.</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-blue)"></div>
+          <div class="insight-text">Top 3 sources (DEAE, SPEC.org, Phoronix) contribute <strong>71.8%</strong> of all records — healthy concentration without over-dependence.</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-purple)"></div>
+          <div class="insight-text"><strong>2025 achieved the highest benchmark execution volume</strong> at 6,740 executions — a 27.7% increase over 2024.</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-green)"></div>
+          <div class="insight-text">Data quality score of <strong>95%</strong> exceeds enterprise threshold (90%) for the third consecutive year.</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-orange)"></div>
+          <div class="insight-text">Manual executions declining at <strong>−12% CAGR</strong>; projected to fall below 40% share by Q3 2026 at current trend.</div>
+        </div>
+      </div>
+
+      <!-- Recommendations Panel -->
+      <div class="insights-card">
+        <div class="insights-header">
+          <div class="insights-icon" style="background:var(--gradient-teal)">▲</div>
+          <div>
+            <div class="insights-title">Recommendations & Next Actions</div>
+            <div class="insights-subtitle">Prioritized by impact · Executive briefing</div>
+          </div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-red)"></div>
+          <div class="insight-text"><strong>HIGH:</strong> Close the 25.19 pp gap to the 80% automation target — focus on EPP, JET, and SIT sources which remain primarily manual.</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-orange)"></div>
+          <div class="insight-text"><strong>MEDIUM:</strong> Azure and OCI sources show low record volumes — assess utilization or consider consolidation to improve coverage efficiency.</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-blue)"></div>
+          <div class="insight-text"><strong>MEDIUM:</strong> Execution success rate trending at 91% — investigate the 9% failure category to improve benchmark reliability.</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-teal)"></div>
+          <div class="insight-text"><strong>LOW:</strong> Historical consistency score of 83% — standardize data retention policies across all 13 sources for long-term coherence.</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-dot" style="background:var(--accent-green)"></div>
+          <div class="insight-text"><strong>ON TRACK:</strong> Projected 2026 full-year volume of ~48,620 records is 18% above 2025 — no corrective action needed for volume.</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- BOTTOM BAR -->
+  <div class="bottom-bar">
+    <div>EPDW Executive Analytics Dashboard &nbsp;·&nbsp; AMD Performance & Benchmarking Division &nbsp;·&nbsp; All data sourced from EPDW production warehouse</div>
+    <div class="bottom-bar-right">
+      <span>Last updated: June 16, 2026 10:42 AM</span>
+      <span class="bottom-bar-tag">Power BI Ready</span>
+      <span class="bottom-bar-tag">v3.1.0</span>
+    </div>
+  </div>
+</div><!-- /main-wrapper -->
+
+<!-- ─── ACTIVE FILTER CHIPS BAR (inserted after header) ─── -->
+<div class="active-filters-bar" id="filterChipsBar" style="display:none"></div>
+
+<!-- ─── DRILL-THROUGH PANEL ─── -->
+<div class="drill-overlay" id="drillOverlay" onclick="closeDrill()"></div>
+<div id="drillPanel">
+  <div class="drill-header">
+    <div class="drill-title" id="drillTitle">Detail View</div>
+    <button class="drill-close" onclick="closeDrill()">✕</button>
+  </div>
+  <div id="drillBody"></div>
+</div>
+
+<!-- ─── TOAST ─── -->
+<div id="toast">
+  <span class="toast-icon" id="toastIcon">✓</span>
+  <span class="toast-msg" id="toastMsg"></span>
+  <span class="toast-close" onclick="hideToast()">✕</span>
+</div>
+
+<!-- ═══════════════════ SCRIPTS ═══════════════════ -->
+<script>
+Chart.register(ChartDataLabels);
+
+// ═══════════════════════════════════════════════════════════
+// DATA STORE  — keyed by [year][execType][source]
+// ═══════════════════════════════════════════════════════════
+const SOURCES = ['DEAE Manual Execution','SPEC.org','OpenBenchmarking Phoronix',
+                 'EPP','Azure','JET','SIT','OCI','Red Hat'];
+
+// Master data matrix: [records, executions, iterations, automationPct]
+const DATA = {
+  all: {
+    all: { records:218570, executions:18900, iterations:66231, autoPct:54.81, quality:95,
+           srcRecords:[68210,53540,35180,22950,14870,9820,6440,4730,2830] },
+    manual:    { records:98757, executions:8550, iterations:29904, autoPct:0, quality:94,
+                 srcRecords:[45200,20100,14200,8900,4700,2800,1800,900,157] },
+    automated: { records:119813, executions:10350, iterations:36327, autoPct:100, quality:96,
+                 srcRecords:[23010,33440,20980,14050,10170,7020,4640,3830,2673] },
+  },
+  2022: {
+    all:       { records:18240, executions:1420, iterations:4980, autoPct:23.1, quality:88,
+                 srcRecords:[5200,3800,2800,2100,1400,1100,800,600,440] },
+    manual:    { records:14028, executions:1094, iterations:3834, autoPct:0, quality:87,
+                 srcRecords:[4200,3100,2200,1600,1100,800,600,400,28] },
+    automated: { records:4212,  executions:326,  iterations:1146, autoPct:100, quality:89,
+                 srcRecords:[1000,700,600,500,300,300,200,200,412] },
+  },
+  2023: {
+    all:       { records:42310, executions:3870, iterations:13560, autoPct:31.8, quality:91,
+                 srcRecords:[14100,10200,7100,4900,2800,1500,900,500,310] },
+    manual:    { records:28860, executions:2641, iterations:9252, autoPct:0, quality:90,
+                 srcRecords:[9800,7200,4900,3400,2000,1000,700,500,360] },
+    automated: { records:13450, executions:1229, iterations:4308, autoPct:100, quality:92,
+                 srcRecords:[4300,3000,2200,1500,800,500,200,0,950] },
+  },
+  2024: {
+    all:       { records:58900, executions:5280, iterations:18430, autoPct:45.6, quality:93,
+                 srcRecords:[18200,14800,9800,6800,3900,2400,1600,900,500] },
+    manual:    { records:32056, executions:2872, iterations:10010, autoPct:0, quality:92,
+                 srcRecords:[10200,8300,5200,3700,2200,1400,900,500,1656] },
+    automated: { records:26844, executions:2408, iterations:8420, autoPct:100, quality:94,
+                 srcRecords:[8000,6500,4600,3100,1700,1000,700,400,2844] },
+  },
+  2025: {
+    all:       { records:74810, executions:6740, iterations:21870, autoPct:51.2, quality:94,
+                 srcRecords:[22100,17400,10800,6400,4200,3100,2200,1600,1010] },
+    manual:    { records:36523, executions:3293, iterations:10678, autoPct:0, quality:93,
+                 srcRecords:[11200,8700,5400,3200,2100,1600,1100,800,2423] },
+    automated: { records:38287, executions:3447, iterations:11192, autoPct:100, quality:95,
+                 srcRecords:[10900,8700,5400,3200,2100,1500,1100,800,2587] },
+  },
+  2026: {
+    all:       { records:24310, executions:1590, iterations:7391, autoPct:54.81, quality:95,
+                 srcRecords:[8610,7340,4480,2750,2570,1920,1140,730,770] },
+    manual:    { records:10990, executions:720,  iterations:3345, autoPct:0, quality:95,
+                 srcRecords:[3900,3200,2100,1200,1200,900,600,400,1490] },
+    automated: { records:13320, executions:870,  iterations:4046, autoPct:100, quality:96,
+                 srcRecords:[4710,4140,2380,1550,1370,1020,540,330,1280] },
+  },
+};
+
+// Source-scoped multipliers (fraction of total for each source)
+const SOURCE_FRACS = {
+  'DEAE Manual Execution':     [0.315,0.246,0.203,0.127,0.097,0.012],
+  'SPEC.org':                  [0.245,0.179,0.241,0.153,0.182,0.0],
+  'OpenBenchmarking Phoronix': [0.161,0.167,0.132,0.096,0.056,0.388],
+  'EPP':                       [0.105,0.115,0.115,0.093,0.071,0.501],
+  'Azure':                     [0.068,0.066,0.066,0.068,0.116,0.616],
+  'JET':                       [0.045,0.035,0.041,0.051,0.051,0.777],
+  'SIT':                       [0.029,0.021,0.027,0.038,0.0,1.0],
+  'OCI':                       [0.022,0.012,0.015,0.027,0.0,1.0],
+  'Red Hat':                   [0.013,0.008,0.016,0.0,0.0,1.0],
+};
+
+// Previous year lookup for YoY badges
+const PREV = { 2022:null, 2023:2022, 2024:2023, 2025:2024, 2026:2025, all:null };
+
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const COLORS = {
+  blue:'#4f9eff', purple:'#8b5cf6', teal:'#14b8a6',
+  green:'#10d98a', orange:'#f59e0b', red:'#ef4444',
+  indigo:'#6366f1', pink:'#ec4899', muted:'#4a6080',
+};
+const FONT = { family:"'Segoe UI', sans-serif" };
+const GRID_OPTS = { color:'rgba(255,255,255,0.05)', drawBorder:false };
+const TICK_OPTS = { color:'#4a6080', font:{ size:10, ...FONT } };
+const TT_BASE = {
+  backgroundColor:'#1a2540',
+  borderColor:'rgba(99,179,237,0.35)', borderWidth:1,
+  titleColor:'#e8f0fe', bodyColor:'#8ba3cc',
+};
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let activeYear   = '2026';
+let activeExec   = 'all';
+let activeSrc    = 'all';
+let activeSearch = '';
+let toastTimer   = null;
+
+// ═══════════════════════════════════════════════════════════
+// DATA RESOLVER
+// ═══════════════════════════════════════════════════════════
+function resolve(year, exec, src) {
+  const yKey = (year === 'all') ? 'all' : parseInt(year);
+  const eKey = exec || 'all';
+  let row = (DATA[yKey] && DATA[yKey][eKey]) ? DATA[yKey][eKey] : DATA.all.all;
+
+  if (src !== 'all') {
+    const si = SOURCES.indexOf(src);
+    if (si >= 0) {
+      const yIdx = ['2022','2023','2024','2025','2026','all'].indexOf(String(year));
+      const frac = SOURCE_FRACS[src][yIdx >= 0 ? yIdx : 5];
+      return {
+        records:    Math.round(row.records * frac),
+        executions: Math.round(row.executions * frac),
+        iterations: Math.round(row.iterations * frac),
+        autoPct:    row.autoPct,
+        quality:    row.quality,
+        srcRecords: row.srcRecords.map((v,i) => (i === si) ? v : 0),
+      };
+    }
+  }
+  return row;
+}
+
+function prevResolve(year, exec, src) {
+  const py = PREV[year === 'all' ? 'all' : parseInt(year)];
+  if (!py) return null;
+  return resolve(String(py), exec, src);
+}
+
+function yoyBadge(curr, prev, suffix='') {
+  if (!prev || prev === 0) return '<span class="kpi-badge neutral">— N/A</span>';
+  const pct = ((curr - prev) / prev * 100).toFixed(1);
+  const cls = pct >= 0 ? 'up' : 'down';
+  const arrow = pct >= 0 ? '▲' : '▼';
+  return `<span class="kpi-badge ${cls}">${arrow} ${Math.abs(pct)}%${suffix}</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART INSTANCES
+// ═══════════════════════════════════════════════════════════
+let barChartInst, lineChartInst, donutYearInst, stackedBarInst,
+    top5DonutInst, radarInst, benchTrendInst;
+
+// ─── Horizontal Bar ─────────────────────────────────────
+barChartInst = new Chart(document.getElementById('barChart'), {
+  type: 'bar',
+  data: {
+    labels: ['DEAE Manual Exec','SPEC.org','OpenBench Phoronix','EPP',
+             'Azure','JET','SIT','OCI','Red Hat'],
+    datasets: [{
+      data: DATA[2026].all.srcRecords,
+      backgroundColor: [
+        'rgba(79,158,255,0.75)','rgba(139,92,246,0.75)','rgba(20,184,166,0.75)',
+        'rgba(16,217,138,0.75)','rgba(245,158,11,0.75)','rgba(99,102,241,0.75)',
+        'rgba(236,72,153,0.75)','rgba(239,68,68,0.75)','rgba(74,96,128,0.75)',
+      ],
+      borderColor: ['#4f9eff','#8b5cf6','#14b8a6','#10d98a',
+                    '#f59e0b','#6366f1','#ec4899','#ef4444','#4a6080'],
+      borderWidth:1, borderRadius:5, borderSkipped:false,
+    }],
+  },
+  options: {
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    animation: { duration:600 },
+    plugins: {
+      legend:{ display:false },
+      datalabels:{ anchor:'end', align:'right', color:'#8ba3cc',
+                   font:{ size:10, ...FONT }, formatter: v => v.toLocaleString() },
+      tooltip:{ ...TT_BASE, callbacks:{ label: ctx => ' '+ctx.raw.toLocaleString()+' records' } },
+    },
+    scales: {
+      x:{ grid:GRID_OPTS, ticks:TICK_OPTS, border:{ display:false } },
+      y:{ grid:{ display:false }, ticks:{ ...TICK_OPTS, font:{ size:10 } }, border:{ display:false } },
+    },
+    onClick(e, els) {
+      if (!els.length) return;
+      const src = SOURCES[els[0].index];
+      document.getElementById('sourceFilter').value = src;
+      activeSrc = src;
+      applyFilters(false);
+      showToast('info','🔎 Filtered to source: '+src);
+    },
+  },
+});
+
+// ─── Multi-Line Trend ────────────────────────────────────
+lineChartInst = new Chart(document.getElementById('lineChart'), {
+  type:'line',
+  data:{
+    labels:['2022','2023','2024','2025','2026 F'],
+    datasets:[
+      { label:'Executions',
+        data:[1420,3870,5280,6740,null],
+        borderColor:COLORS.blue, backgroundColor:'rgba(79,158,255,0.1)',
+        borderWidth:2.5, pointRadius:4, pointHoverRadius:7, tension:0.4, fill:true },
+      { label:'Iterations',
+        data:[4980,13560,18430,21870,null],
+        borderColor:COLORS.teal, backgroundColor:'rgba(20,184,166,0.08)',
+        borderWidth:2.5, pointRadius:4, pointHoverRadius:7, tension:0.4, fill:true },
+      { label:'Exec Forecast',
+        data:[null,null,null,6740,8100],
+        borderColor:COLORS.blue, borderDash:[6,4],
+        backgroundColor:'transparent', borderWidth:1.5,
+        pointRadius:[0,0,0,0,5], pointHoverRadius:7, tension:0.4 },
+      { label:'Iter Forecast',
+        data:[null,null,null,21870,26400],
+        borderColor:COLORS.teal, borderDash:[6,4],
+        backgroundColor:'transparent', borderWidth:1.5,
+        pointRadius:[0,0,0,0,5], pointHoverRadius:7, tension:0.4 },
+    ],
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:{ duration:600 },
+    plugins:{ legend:{ display:false }, datalabels:{ display:false }, tooltip:TT_BASE },
+    scales:{
+      x:{ grid:GRID_OPTS, ticks:TICK_OPTS, border:{ display:false } },
+      y:{ grid:GRID_OPTS, ticks:TICK_OPTS, border:{ display:false } },
+    },
+  },
+});
+
+// ─── Donut by Year ───────────────────────────────────────
+donutYearInst = new Chart(document.getElementById('donutYearChart'), {
+  type:'doughnut',
+  data:{
+    labels:['2022','2023','2024','2025','2026 YTD'],
+    datasets:[{ data:[4072,14132,31752,51405,18452],
+      backgroundColor:['rgba(79,158,255,0.8)','rgba(139,92,246,0.8)',
+                       'rgba(20,184,166,0.8)','rgba(16,217,138,0.8)','rgba(245,158,11,0.8)'],
+      borderColor:'#131d35', borderWidth:2, hoverOffset:8 }],
+  },
+  options:{
+    cutout:'68%', responsive:true, maintainAspectRatio:false, animation:{ duration:600 },
+    plugins:{
+      legend:{ display:false },
+      datalabels:{ color:'#fff', font:{ size:9, weight:'bold' },
+        formatter:(v,ctx) => { const s=ctx.dataset.data.reduce((a,b)=>a+b,0); return (v/s*100).toFixed(0)+'%'; },
+        display: ctx => ctx.dataset.data[ctx.dataIndex] > 3000 },
+      tooltip:{ ...TT_BASE, callbacks:{ label: ctx => ' '+ctx.raw.toLocaleString()+' automated' } },
+    },
+  },
+});
+
+// ─── Stacked Bar ─────────────────────────────────────────
+stackedBarInst = new Chart(document.getElementById('stackedBarChart'), {
+  type:'bar',
+  data:{
+    labels:['2022','2023','2024','2025','2026 YTD'],
+    datasets:[
+      { label:'Automated', data:[4072,14132,31752,51405,18452],
+        backgroundColor:'rgba(79,158,255,0.8)',
+        borderRadius:{ topLeft:0, topRight:0, bottomLeft:4, bottomRight:4 } },
+      { label:'Manual', data:[14168,28178,27148,23405,5858],
+        backgroundColor:'rgba(79,158,255,0.22)',
+        borderRadius:{ topLeft:4, topRight:4, bottomLeft:0, bottomRight:0 } },
+    ],
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:{ duration:600 },
+    plugins:{
+      legend:{ display:false },
+      datalabels:{ display: ctx => ctx.dataset.data[ctx.dataIndex] > 5000,
+                   color:'#8ba3cc', font:{ size:9 }, formatter: v => (v/1000).toFixed(0)+'k' },
+      tooltip:TT_BASE,
+    },
+    scales:{
+      x:{ stacked:true, grid:{ display:false }, ticks:TICK_OPTS, border:{ display:false } },
+      y:{ stacked:true, grid:GRID_OPTS, ticks:TICK_OPTS, border:{ display:false } },
+    },
+  },
+});
+
+// ─── Gauge (Canvas) ──────────────────────────────────────
+function drawGauge(pct) {
+  const canvas = document.getElementById('gaugeChart');
+  const ctx = canvas.getContext('2d');
+  canvas.width=180; canvas.height=120;
+  ctx.clearRect(0,0,180,120);
+  const cx=90, cy=110, r=80, startA=Math.PI, lineW=14;
+  // Track
+  ctx.beginPath(); ctx.arc(cx,cy,r,startA,2*Math.PI);
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=lineW; ctx.lineCap='round'; ctx.stroke();
+  // Segments
+  [{from:0,to:0.4,color:'#ef4444'},{from:0.4,to:0.7,color:'#f59e0b'},{from:0.7,to:1.0,color:'#10d98a'}]
+    .forEach(s => {
+      ctx.beginPath(); ctx.arc(cx,cy,r,startA+s.from*Math.PI,startA+s.to*Math.PI);
+      ctx.strokeStyle=s.color+'60'; ctx.lineWidth=lineW; ctx.lineCap='butt'; ctx.stroke();
+    });
+  // Value arc
+  const val=pct/100;
+  ctx.beginPath(); ctx.arc(cx,cy,r,startA,startA+val*Math.PI);
+  const g=ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+  g.addColorStop(0,'#ef4444'); g.addColorStop(0.5,'#f59e0b'); g.addColorStop(1,'#10d98a');
+  ctx.strokeStyle=g; ctx.lineWidth=lineW; ctx.lineCap='round'; ctx.stroke();
+  // Target 80%
+  const ta=startA+0.8*Math.PI;
+  ctx.beginPath();
+  ctx.moveTo(cx+(r-lineW-2)*Math.cos(ta), cy+(r-lineW-2)*Math.sin(ta));
+  ctx.lineTo(cx+(r+6)*Math.cos(ta),       cy+(r+6)*Math.sin(ta));
+  ctx.strokeStyle='#10d98a'; ctx.lineWidth=2; ctx.stroke();
+  // Needle
+  const na=startA+val*Math.PI;
+  ctx.beginPath(); ctx.moveTo(cx,cy);
+  ctx.lineTo(cx+(r-6)*Math.cos(na), cy+(r-6)*Math.sin(na));
+  ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,5,0,2*Math.PI); ctx.fillStyle='#fff'; ctx.fill();
+}
+drawGauge(54.81);
+
+// ─── Top 5 Donut ─────────────────────────────────────────
+top5DonutInst = new Chart(document.getElementById('top5DonutChart'), {
+  type:'doughnut',
+  data:{
+    labels:['DEAE Manual','SPEC.org','Phoronix','EPP','Azure','Others'],
+    datasets:[{ data:[31.2,24.5,16.1,10.5,0,17.7],
+      backgroundColor:['rgba(79,158,255,0.85)','rgba(139,92,246,0.85)',
+                       'rgba(20,184,166,0.85)','rgba(16,217,138,0.85)',
+                       'rgba(245,158,11,0.85)','rgba(74,96,128,0.5)'],
+      borderColor:'#131d35', borderWidth:2, hoverOffset:8 }],
+  },
+  options:{
+    cutout:'65%', responsive:true, maintainAspectRatio:false, animation:{ duration:600 },
+    plugins:{
+      legend:{ display:false }, datalabels:{ display:false },
+      tooltip:{ ...TT_BASE, callbacks:{ label: ctx => ' '+ctx.raw+'% of records' } },
+    },
+  },
+});
+
+// ─── Radar ───────────────────────────────────────────────
+radarInst = new Chart(document.getElementById('radarChart'), {
+  type:'radar',
+  data:{
+    labels:['Coverage','Success Rate','Availability','Data Quality','Consistency'],
+    datasets:[
+      { label:'2025', data:[58,86,70,92,78],
+        borderColor:'rgba(79,158,255,0.35)', backgroundColor:'rgba(79,158,255,0.06)',
+        borderWidth:1.5, pointRadius:3 },
+      { label:'2026', data:[68,91,78,95,83],
+        borderColor:COLORS.blue, backgroundColor:'rgba(79,158,255,0.12)',
+        borderWidth:2, pointRadius:4, pointHoverRadius:6 },
+    ],
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:{ duration:600 },
+    plugins:{ legend:{ display:false }, datalabels:{ display:false }, tooltip:TT_BASE },
+    scales:{
+      r:{ min:0, max:100,
+          grid:{ color:'rgba(255,255,255,0.06)' },
+          angleLines:{ color:'rgba(255,255,255,0.06)' },
+          pointLabels:{ color:'#8ba3cc', font:{ size:9, ...FONT } },
+          ticks:{ display:false, stepSize:25 } },
+    },
+  },
+});
+
+// ─── Heatmap ─────────────────────────────────────────────
+const HEATMAP_DATA = (function() {
+  const benchmarks=['SPEC CPU 2017','Phoronix PTSuite','SPEC Power','MLPerf','SPECjbb',
+                    'STREAM','NAMD','OpenFOAM','GROMACS'];
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Fixed seed values so heatmap is deterministic
+  const seed=[
+    [87,92,115,78,103,66,0,0,0,0,0,0],
+    [54,61,88,42,97,110,0,0,0,0,0,0],
+    [33,47,55,68,41,73,0,0,0,0,0,0],
+    [22,18,31,25,44,37,0,0,0,0,0,0],
+    [71,83,59,90,67,48,0,0,0,0,0,0],
+    [15,29,38,52,21,63,0,0,0,0,0,0],
+    [44,37,52,28,61,45,0,0,0,0,0,0],
+    [18,24,33,41,29,17,0,0,0,0,0,0],
+    [9,12,21,16,28,14,0,0,0,0,0,0],
+  ];
+  return { benchmarks, months, seed };
+})();
+
+function buildHeatmap(year) {
+  const { benchmarks, months, seed } = HEATMAP_DATA;
+  const grid = document.getElementById('heatmapGrid');
+  grid.innerHTML = '<div class="heatmap-row-label"></div>';
+  months.forEach(m => {
+    const el = document.createElement('div');
+    el.className='heatmap-header'; el.textContent=m; grid.appendChild(el);
+  });
+  const cutoff = (year === 'all' || year === '2026') ? 6 : 12;
+  benchmarks.forEach((bench,bi) => {
+    const lbl = document.createElement('div');
+    lbl.className='heatmap-row-label'; lbl.textContent=bench; grid.appendChild(lbl);
+    months.forEach((m,mi) => {
+      const raw = seed[bi][mi];
+      const val = (mi < cutoff) ? raw : 0;
+      const intensity = val/125;
+      const cell = document.createElement('div');
+      cell.className='heatmap-cell';
+      cell.style.background = val===0
+        ? 'rgba(255,255,255,0.03)'
+        : `rgba(79,158,255,${0.08+intensity*0.82})`;
+      if (val > 0) cell.textContent=val;
+      cell.title=`${bench} · ${m}: ${val} executions`;
+      cell.onclick = () => showToast('info', `${bench} · ${m}: ${val} executions`);
+      grid.appendChild(cell);
+    });
+  });
+}
+buildHeatmap('2026');
+
+// ─── Benchmark Trend ─────────────────────────────────────
+const BENCH_LABELS_2025=['Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25',
+                         'Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25'];
+const BENCH_LABELS_2026=['Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26'];
+const BENCH_ALL_LABELS=[...BENCH_LABELS_2025,...BENCH_LABELS_2026];
+
+const BENCH_DATA = {
+  all:   { exec:[480,520,610,580,670,720,690,780,820,870,910,950,420,490,560,510,580,620],
+           succ:[88,89,91,90,92,93,91,94,93,95,94,96,92,93,94,91,95,94],
+           fail:[58,57,55,58,53,50,62,47,57,44,55,38,33,35,34,45,29,37] },
+  2025:  { exec:[480,520,610,580,670,720,690,780,820,870,910,950],
+           succ:[88,89,91,90,92,93,91,94,93,95,94,96],
+           fail:[58,57,55,58,53,50,62,47,57,44,55,38] },
+  2026:  { exec:[420,490,560,510,580,620],
+           succ:[92,93,94,91,95,94],
+           fail:[33,35,34,45,29,37] },
+};
+
+benchTrendInst = new Chart(document.getElementById('benchTrendChart'), {
+  type:'line',
+  data:{
+    labels: BENCH_ALL_LABELS,
+    datasets:[
+      { label:'Executions',
+        data:BENCH_DATA.all.exec,
+        borderColor:COLORS.blue, backgroundColor:'rgba(79,158,255,0.07)',
+        borderWidth:2, pointRadius:2, pointHoverRadius:5, tension:0.4, fill:true, yAxisID:'y' },
+      { label:'Success Rate %',
+        data:BENCH_DATA.all.succ,
+        borderColor:COLORS.green, backgroundColor:'transparent',
+        borderWidth:2, pointRadius:2, pointHoverRadius:5, tension:0.4, yAxisID:'y2' },
+      { label:'Failures',
+        data:BENCH_DATA.all.fail,
+        borderColor:COLORS.red, backgroundColor:'rgba(239,68,68,0.06)',
+        borderWidth:1.5, pointRadius:2, pointHoverRadius:5, tension:0.4, fill:true, yAxisID:'y' },
+    ],
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:{ duration:600 },
+    interaction:{ mode:'index', intersect:false },
+    plugins:{ legend:{ display:false }, datalabels:{ display:false }, tooltip:TT_BASE },
+    scales:{
+      x:{ grid:GRID_OPTS, ticks:{ ...TICK_OPTS, maxTicksLimit:9 }, border:{ display:false } },
+      y:{ grid:GRID_OPTS, ticks:TICK_OPTS, border:{ display:false }, position:'left' },
+      y2:{ position:'right', min:80, max:100, grid:{ display:false },
+           ticks:{ ...TICK_OPTS, callback: v => v+'%' }, border:{ display:false } },
+    },
+  },
+});
+
+// ═══════════════════════════════════════════════════════════
+// KPI UPDATE
+// ═══════════════════════════════════════════════════════════
+function animateNumber(el, target, prefix='', suffix='') {
+  const start = parseFloat(el.dataset.raw || '0');
+  el.dataset.raw = target;
+  const dur = 550, fps = 40, steps = dur / (1000/fps);
+  let step = 0;
+  const tick = () => {
+    step++;
+    const t = step/steps;
+    const ease = 1 - Math.pow(1 - t, 3);
+    const cur = start + (target - start) * ease;
+    el.textContent = prefix + (Number.isInteger(target)
+      ? Math.round(cur).toLocaleString()
+      : cur.toFixed(2)) + suffix;
+    if (step < steps) requestAnimationFrame(tick);
+    else el.textContent = prefix + (Number.isInteger(target)
+      ? target.toLocaleString() : target.toFixed(2)) + suffix;
+  };
+  requestAnimationFrame(tick);
+}
+
+function updateKPIs(row, prevRow, yearLabel) {
+  const kpis = document.querySelectorAll('.kpi-value');
+  const footers = document.querySelectorAll('.kpi-footer');
+
+  // Flash effect
+  kpis.forEach(el => el.classList.add('updating'));
+  setTimeout(() => kpis.forEach(el => el.classList.remove('updating')), 200);
+
+  setTimeout(() => {
+    animateNumber(kpis[0], row.records);
+    animateNumber(kpis[1], row.executions);
+    animateNumber(kpis[2], row.iterations);
+    animateNumber(kpis[3], row.autoPct, '', '%');
+    // kpis[4] = sources count — always 13
+    animateNumber(kpis[5], row.quality, '', '%');
+
+    // Update badges
+    if (prevRow) {
+      footers[0].innerHTML = yoyBadge(row.records, prevRow.records)
+        + ` <span class="kpi-footer-text">vs prev year</span>`;
+      footers[1].innerHTML = yoyBadge(row.executions, prevRow.executions)
+        + ` <span class="kpi-footer-text">vs prev year</span>`;
+      footers[2].innerHTML = yoyBadge(row.iterations, prevRow.iterations)
+        + ` <span class="kpi-footer-text">vs prev year</span>`;
+      const ppDiff = (row.autoPct - prevRow.autoPct).toFixed(1);
+      const cls = ppDiff >= 0 ? 'up' : 'down';
+      footers[3].innerHTML = `<span class="kpi-badge ${cls}">${ppDiff>=0?'▲':'▼'} ${Math.abs(ppDiff)} pp</span>`
+        + ` <span class="kpi-footer-text">from ${prevRow.autoPct}%</span>`;
+      footers[5].innerHTML = yoyBadge(row.quality, prevRow.quality)
+        + ` <span class="kpi-footer-text">vs prev year</span>`;
+    }
+
+    // Update section meta
+    const meta = document.querySelector('.section-meta');
+    if (meta) {
+      meta.textContent = `${yearLabel} · ${activeSrc === 'all' ? 'All Sources' : activeSrc} · Refreshed just now`;
+    }
+  }, 220);
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART UPDATERS
+// ═══════════════════════════════════════════════════════════
+function updateBarChart(srcRecords) {
+  barChartInst.data.datasets[0].data = srcRecords;
+  barChartInst.update('active');
+}
+
+function updateStackedBar(year, exec) {
+  const years = ['2022','2023','2024','2025','2026'];
+  const autoData = years.map(y => {
+    const r = resolve(y, exec, activeSrc);
+    return Math.round(r.records * (r.autoPct/100));
+  });
+  const manData = years.map(y => {
+    const r = resolve(y, exec, activeSrc);
+    return Math.round(r.records * (1 - r.autoPct/100));
+  });
+  stackedBarInst.data.datasets[0].data = autoData;
+  stackedBarInst.data.datasets[1].data = manData;
+  stackedBarInst.update('active');
+}
+
+function updateDonutYear(exec) {
+  const years = ['2022','2023','2024','2025','2026'];
+  const autoData = years.map(y => {
+    const r = resolve(y, exec, activeSrc);
+    return Math.round(r.records * (r.autoPct/100));
+  });
+  donutYearInst.data.datasets[0].data = autoData;
+  donutYearInst.update('active');
+}
+
+function updateBenchTrend(year) {
+  const yKey = (year === '2025' || year === '2026') ? year : 'all';
+  const d = BENCH_DATA[yKey];
+  const lbl = yKey === '2025' ? BENCH_LABELS_2025
+            : yKey === '2026' ? BENCH_LABELS_2026
+            : BENCH_ALL_LABELS;
+  benchTrendInst.data.labels = lbl;
+  benchTrendInst.data.datasets[0].data = d.exec;
+  benchTrendInst.data.datasets[1].data = d.succ;
+  benchTrendInst.data.datasets[2].data = d.fail;
+  benchTrendInst.update('active');
+}
+
+// ═══════════════════════════════════════════════════════════
+// FILTER ENGINE
+// ═══════════════════════════════════════════════════════════
+function applyFilters(showNotification=true) {
+  activeYear = document.getElementById('yearFilter').value;
+  activeExec = document.getElementById('execFilter').value;
+  activeSrc  = document.getElementById('sourceFilter').value;
+
+  const row  = resolve(activeYear, activeExec, activeSrc);
+  const prev = prevResolve(activeYear, activeExec, activeSrc);
+
+  const yearLabel = activeYear === 'all' ? 'All Years' : activeYear + (activeYear==='2026' ? ' YTD':'');
+
+  // KPIs
+  updateKPIs(row, prev, yearLabel);
+
+  // Bar chart
+  updateBarChart(row.srcRecords);
+
+  // Stacked bar / donut
+  updateStackedBar(activeYear, activeExec);
+  updateDonutYear(activeExec);
+
+  // Gauge
+  drawGauge(row.autoPct);
+  document.querySelector('.gauge-pct').textContent = row.autoPct.toFixed(2) + '%';
+  const gap = (80 - row.autoPct).toFixed(2);
+  const gapEl = document.querySelector('.gauge-target span:last-child') ||
+    document.querySelector('[style*="accent-orange"]');
+  if (gapEl) gapEl.textContent = (gap > 0 ? '−' : '+') + Math.abs(gap) + ' pp';
+
+  // Benchmark trend
+  updateBenchTrend(activeYear);
+
+  // Heatmap
+  buildHeatmap(activeYear);
+
+  // Filter chips
+  renderFilterChips();
+
+  // Filter indicator badge
+  const isFiltered = activeYear !== 'all' || activeExec !== 'all' || activeSrc !== 'all';
+  document.getElementById('filterIndicator').style.display = isFiltered ? 'flex' : 'none';
+
+  // Toast
+  if (showNotification) {
+    const parts = [];
+    if (activeYear !== 'all') parts.push(yearLabel);
+    if (activeExec !== 'all') parts.push(activeExec.charAt(0).toUpperCase()+activeExec.slice(1));
+    if (activeSrc  !== 'all') parts.push(activeSrc);
+    const msg = parts.length
+      ? 'Filters applied: ' + parts.join(' · ')
+      : 'Showing all data — no filters active';
+    showToast('success', '✓ ' + msg);
+  }
+
+  // Bottom bar timestamp
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+  const footer = document.querySelector('.bottom-bar span');
+  if (footer) footer.textContent = 'Last updated: June 16, 2026 ' + timeStr;
+}
+
+function resetFilters() {
+  document.getElementById('yearFilter').value   = 'all';
+  document.getElementById('execFilter').value   = 'all';
+  document.getElementById('sourceFilter').value = 'all';
+  document.getElementById('dateFrom').value = '2022-01-01';
+  document.getElementById('dateTo').value   = '2026-06-16';
+  document.getElementById('searchInput').value = '';
+  activeSearch = '';
+  clearSearch();
+  applyFilters(false);
+  showToast('info', '↺ All filters reset — showing full dataset');
+}
+
+// ─── Filter Chips ────────────────────────────────────────
+function renderFilterChips() {
+  const bar = document.getElementById('filterChipsBar');
+  const chips = [];
+
+  if (activeYear !== 'all')
+    chips.push({ label:'Year: '+(activeYear==='2026'?'2026 YTD':activeYear), clear:()=>{ document.getElementById('yearFilter').value='all'; applyFilters(false); } });
+  if (activeExec !== 'all')
+    chips.push({ label:'Type: '+activeExec, clear:()=>{ document.getElementById('execFilter').value='all'; applyFilters(false); } });
+  if (activeSrc !== 'all')
+    chips.push({ label:'Source: '+activeSrc, clear:()=>{ document.getElementById('sourceFilter').value='all'; activeSrc='all'; applyFilters(false); } });
+
+  if (!chips.length) { bar.style.display='none'; return; }
+  bar.style.display='flex';
+  bar.innerHTML = '<span style="font-size:10px;color:var(--text-muted);font-weight:600;margin-right:4px">Active:</span>';
+  chips.forEach(c => {
+    const el = document.createElement('span');
+    el.className='filter-chip';
+    el.innerHTML = c.label + ' <span class="chip-x">✕</span>';
+    el.onclick = c.clear;
+    bar.appendChild(el);
+  });
+  // "Clear all"
+  if (chips.length > 1) {
+    const all = document.createElement('span');
+    all.className='filter-chip';
+    all.style.borderColor='rgba(239,68,68,0.3)'; all.style.color='var(--accent-red)';
+    all.style.background='rgba(239,68,68,0.08)';
+    all.innerHTML='Clear all ✕';
+    all.onclick=resetFilters;
+    bar.appendChild(all);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════════════════════
+function handleSearch(val) {
+  activeSearch = val.trim().toLowerCase();
+  document.getElementById('searchClear').style.display = activeSearch ? 'inline' : 'none';
+  if (!activeSearch) { clearHighlights(); return; }
+
+  // Highlight matching chart labels (bar chart)
+  highlightBarChart(activeSearch);
+
+  // Highlight source select
+  const src = document.getElementById('sourceFilter');
+  let found = false;
+  for (let o of src.options) {
+    if (o.value !== 'all' && o.value.toLowerCase().includes(activeSearch)) {
+      src.value = o.value; activeSrc = o.value; found = true; break;
+    }
+  }
+  if (found) applyFilters(false);
+
+  // Highlight insight text
+  highlightInsights(activeSearch);
+}
+
+function highlightBarChart(q) {
+  barChartInst.data.datasets[0].backgroundColor = SOURCES.map((s,i) => {
+    const colors = ['rgba(79,158,255,0.75)','rgba(139,92,246,0.75)','rgba(20,184,166,0.75)',
+                    'rgba(16,217,138,0.75)','rgba(245,158,11,0.75)','rgba(99,102,241,0.75)',
+                    'rgba(236,72,153,0.75)','rgba(239,68,68,0.75)','rgba(74,96,128,0.75)'];
+    if (q && !s.toLowerCase().includes(q)) return colors[i].replace('0.75','0.15');
+    return colors[i];
+  });
+  barChartInst.update('none');
+}
+
+function highlightInsights(q) {
+  document.querySelectorAll('.insight-text').forEach(el => {
+    const orig = el.dataset.orig || el.innerHTML;
+    el.dataset.orig = orig;
+    if (!q) { el.innerHTML = orig; return; }
+    const re = new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')', 'gi');
+    el.innerHTML = orig.replace(re, '<mark class="search-highlight">$1</mark>');
+  });
+}
+
+function clearHighlights() {
+  highlightBarChart('');
+  document.querySelectorAll('.insight-text').forEach(el => {
+    if (el.dataset.orig) el.innerHTML = el.dataset.orig;
+  });
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value='';
+  document.getElementById('searchClear').style.display='none';
+  activeSearch='';
+  clearHighlights();
+  if (activeSrc !== 'all') { activeSrc='all'; document.getElementById('sourceFilter').value='all'; applyFilters(false); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// DRILL-THROUGH PANEL
+// ═══════════════════════════════════════════════════════════
+const DRILL_DEFS = {
+  records: {
+    title: 'Total Records — Detail',
+    rows: (r,p) => [
+      ['Current total', r.records.toLocaleString()],
+      ['vs Prior year', p ? ((r.records-p.records)>=0?'+':'')+((r.records-p.records)/p.records*100).toFixed(1)+'%' : '—'],
+      ['Automated', Math.round(r.records*r.autoPct/100).toLocaleString()],
+      ['Manual', Math.round(r.records*(1-r.autoPct/100)).toLocaleString()],
+      ['Largest source', 'DEAE Manual Exec'],
+      ['Coverage sources', '9 active'],
+    ],
+  },
+  executions: {
+    title: 'Total Executions — Detail',
+    rows: (r,p) => [
+      ['Total executions', r.executions.toLocaleString()],
+      ['YoY growth', p ? ((r.executions-p.executions)/p.executions*100).toFixed(1)+'%' : '—'],
+      ['Automated execs', Math.round(r.executions*r.autoPct/100).toLocaleString()],
+      ['Manual execs', Math.round(r.executions*(1-r.autoPct/100)).toLocaleString()],
+      ['Avg per month', Math.round(r.executions/6).toLocaleString()],
+      ['Peak month', 'Dec 2025 — 950'],
+    ],
+  },
+  iterations: {
+    title: 'Total Iterations — Detail',
+    rows: (r,p) => [
+      ['Total iterations', r.iterations.toLocaleString()],
+      ['YoY growth', p ? ((r.iterations-p.iterations)/p.iterations*100).toFixed(1)+'%' : '—'],
+      ['Avg per execution', (r.iterations/r.executions).toFixed(1)],
+      ['Avg per month', Math.round(r.iterations/6).toLocaleString()],
+    ],
+  },
+  automation: {
+    title: 'Automation % — Detail',
+    rows: (r,p) => [
+      ['Current rate', r.autoPct.toFixed(2)+'%'],
+      ['Target', '80%'],
+      ['Gap to target', (80-r.autoPct).toFixed(2)+' pp'],
+      ['Prior year rate', p ? p.autoPct+'%' : '—'],
+      ['Improvement', p ? ((r.autoPct-p.autoPct)>=0?'+':'')+((r.autoPct-p.autoPct).toFixed(2))+' pp' : '—'],
+      ['Projected EOY', '58.0%'],
+    ],
+  },
+  sources: {
+    title: 'Data Sources — Detail',
+    rows: () => [
+      ['Total active sources', '13'],
+      ['New in 2025', '2 (OCI, Red Hat)'],
+      ['Top contributor', 'DEAE Manual Exec'],
+      ['Lowest volume', 'Red Hat'],
+      ['Automated sources', '7 of 13'],
+      ['Manual-only', '2 of 13'],
+    ],
+  },
+  quality: {
+    title: 'Data Quality Score — Detail',
+    rows: (r) => [
+      ['Overall score', r.quality+'%'],
+      ['Enterprise threshold', '90%'],
+      ['Above threshold by', (r.quality-90)+'pp'],
+      ['Completeness', '97%'],
+      ['Accuracy', '94%'],
+      ['Timeliness', '93%'],
+      ['Consistency', '96%'],
+    ],
+  },
+};
+
+function drillDown(metric) {
+  const def = DRILL_DEFS[metric];
+  if (!def) return;
+  const row  = resolve(activeYear, activeExec, activeSrc);
+  const prev = prevResolve(activeYear, activeExec, activeSrc);
+  document.getElementById('drillTitle').textContent = def.title;
+  const rows = def.rows(row, prev);
+  document.getElementById('drillBody').innerHTML = rows.map(([lbl,val]) =>
+    `<div class="drill-row">
+       <span class="drill-row-label">${lbl}</span>
+       <span class="drill-row-val">${val}</span>
+     </div>`
+  ).join('');
+  document.getElementById('drillPanel').classList.add('open');
+  document.getElementById('drillOverlay').classList.add('show');
+}
+
+function closeDrill() {
+  document.getElementById('drillPanel').classList.remove('open');
+  document.getElementById('drillOverlay').classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════
+function showToast(type, msg) {
+  const t = document.getElementById('toast');
+  const icons = { success:'✓', info:'ℹ', warn:'⚠' };
+  document.getElementById('toastIcon').textContent = icons[type]||'✓';
+  document.getElementById('toastMsg').textContent = msg;
+  t.className = `show toast-${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 3500);
+}
+
+function hideToast() {
+  document.getElementById('toast').classList.remove('show','toast-success','toast-info','toast-warn');
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════
+function exportCSV() {
+  const row = resolve(activeYear, activeExec, activeSrc);
+  const lines = [
+    ['Metric','Value'],
+    ['Year Filter', activeYear],
+    ['Execution Type', activeExec],
+    ['Source Filter', activeSrc],
+    ['Total Records', row.records],
+    ['Total Executions', row.executions],
+    ['Total Iterations', row.iterations],
+    ['Automation %', row.autoPct],
+    ['Data Quality %', row.quality],
+    ...SOURCES.map((s,i) => [s, row.srcRecords[i]]),
+  ];
+  const csv = lines.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `EPDW_${activeYear}_${activeExec}_${activeSrc.replace(/ /g,'_')}.csv`;
+  a.click();
+  showToast('success', '✓ CSV exported — ' + lines.length + ' rows');
+}
+
+function exportPDF() {
+  showToast('info', 'ℹ Opening print dialog for PDF export…');
+  setTimeout(() => window.print(), 600);
+}
+
+function showShareToast() {
+  const url = `${location.href}?year=${activeYear}&exec=${activeExec}&src=${encodeURIComponent(activeSrc)}`;
+  navigator.clipboard && navigator.clipboard.writeText(url);
+  showToast('success', '✓ Dashboard link copied to clipboard');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART PILLS (toggle active state)
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.chart-pill').forEach(pill => {
+  pill.addEventListener('click', function() {
+    const siblings = this.parentElement.querySelectorAll('.chart-pill');
+    siblings.forEach(s => s.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// ENTER KEY on filters
+// ═══════════════════════════════════════════════════════════
+['yearFilter','execFilter','sourceFilter','dateFrom','dateTo'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if (e.key==='Enter') applyFilters(); });
+});
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key==='Escape') clearSearch();
+});
+
+// ═══════════════════════════════════════════════════════════
+// LIVE CLOCK in bottom bar
+// ═══════════════════════════════════════════════════════════
+function updateClock() {
+  const el = document.querySelector('.bottom-bar span');
+  if (!el) return;
+  const now = new Date();
+  const d = now.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+  const t = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+  el.textContent = `Live · ${d} ${t}`;
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// ═══════════════════════════════════════════════════════════
+// BOOT — apply default filter state on load
+// ═══════════════════════════════════════════════════════════
+applyFilters(false);
+</script>
+</body>
+</html>

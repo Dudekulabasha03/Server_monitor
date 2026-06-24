@@ -1,0 +1,363 @@
+---
+# AMD Fleet Monitor — Kubernetes Manifests
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fleet-monitor
+  labels:
+    app.kubernetes.io/name: fleet-monitor
+    app.kubernetes.io/part-of: amd-infrastructure
+
+---
+# ── ConfigMap ─────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fleet-monitor-config
+  namespace: fleet-monitor
+data:
+  VICTORIA_METRICS_URL: "http://victoriametrics:8428"
+  REDIS_URL: "redis://redis:6379/0"
+  COLLECT_INTERVAL_REDFISH: "60"
+  COLLECT_INTERVAL_IPMI: "120"
+  AUTH_PROVIDER: "azure_ad"
+  ALLOWED_ORIGINS: '["https://fleet-monitor.amd.com"]'
+
+---
+# ── Backend Deployment ────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-monitor-backend
+  namespace: fleet-monitor
+  labels:
+    app: fleet-monitor-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fleet-monitor-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: fleet-monitor-backend
+    spec:
+      containers:
+        - name: backend
+          image: amd-fleet-monitor/backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: fleet-monitor-config
+            - secretRef:
+                name: fleet-monitor-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-monitor-backend
+  namespace: fleet-monitor
+spec:
+  selector:
+    app: fleet-monitor-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP
+
+---
+# ── Celery Workers ────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-monitor-worker
+  namespace: fleet-monitor
+spec:
+  replicas: 5  # Scale up for 500+ servers
+  selector:
+    matchLabels:
+      app: fleet-monitor-worker
+  template:
+    metadata:
+      labels:
+        app: fleet-monitor-worker
+    spec:
+      containers:
+        - name: worker
+          image: amd-fleet-monitor/backend:latest
+          command: ["celery", "-A", "app.worker", "worker",
+                    "--loglevel=info", "--concurrency=16",
+                    "--queues=collectors,alerts,discovery"]
+          envFrom:
+            - configMapRef:
+                name: fleet-monitor-config
+            - secretRef:
+                name: fleet-monitor-secrets
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "1Gi"
+            limits:
+              cpu: "4000m"
+              memory: "4Gi"
+
+---
+# ── Frontend Deployment ───────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-monitor-frontend
+  namespace: fleet-monitor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fleet-monitor-frontend
+  template:
+    metadata:
+      labels:
+        app: fleet-monitor-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: amd-fleet-monitor/frontend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://fleet-monitor-api.amd.com"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-monitor-frontend
+  namespace: fleet-monitor
+spec:
+  selector:
+    app: fleet-monitor-frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: ClusterIP
+
+---
+# ── VictoriaMetrics StatefulSet ───────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: victoriametrics
+  namespace: fleet-monitor
+spec:
+  serviceName: victoriametrics
+  replicas: 1
+  selector:
+    matchLabels:
+      app: victoriametrics
+  template:
+    metadata:
+      labels:
+        app: victoriametrics
+    spec:
+      containers:
+        - name: victoriametrics
+          image: victoriametrics/victoria-metrics:v1.101.0
+          args:
+            - "-storageDataPath=/storage"
+            - "-retentionPeriod=60d"
+            - "-httpListenAddr=:8428"
+          ports:
+            - containerPort: 8428
+          volumeMounts:
+            - name: storage
+              mountPath: /storage
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "4000m"
+              memory: "16Gi"
+  volumeClaimTemplates:
+    - metadata:
+        name: storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 500Gi
+        storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: victoriametrics
+  namespace: fleet-monitor
+spec:
+  selector:
+    app: victoriametrics
+  ports:
+    - port: 8428
+      targetPort: 8428
+  type: ClusterIP
+
+---
+# ── Redis ─────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: fleet-monitor
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command: ["redis-server", "--appendonly", "yes", "--maxmemory", "4gb", "--maxmemory-policy", "allkeys-lru"]
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "1Gi"
+            limits:
+              cpu: "1000m"
+              memory: "5Gi"
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: fleet-monitor
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+  type: ClusterIP
+
+---
+# ── Ingress ───────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fleet-monitor-ingress
+  namespace: fleet-monitor
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # WebSocket support for live dashboard
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - fleet-monitor.amd.com
+        - fleet-monitor-api.amd.com
+      secretName: fleet-monitor-tls
+  rules:
+    - host: fleet-monitor.amd.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fleet-monitor-frontend
+                port:
+                  number: 3000
+    - host: fleet-monitor-api.amd.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fleet-monitor-backend
+                port:
+                  number: 8000
+
+---
+# ── HPA — Auto-scale workers for fleet size ───────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: fleet-monitor-worker-hpa
+  namespace: fleet-monitor
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: fleet-monitor-worker
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

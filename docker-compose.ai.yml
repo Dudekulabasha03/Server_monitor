@@ -1,0 +1,116 @@
+version: "3.9"
+
+# Helios AI — EXPERIMENTAL stack (multi-agent AI layer).
+# Runs in parallel with production on OFFSET ports + separate volumes so prod
+# (3000/8000/5432/...) is never touched and serves as the backup.
+#
+# Up:   docker compose -p fleetmon-ai -f docker-compose.ai.yml up -d
+# Down: docker compose -p fleetmon-ai -f docker-compose.ai.yml down
+#
+# Seed the experimental DB once from prod:
+#   docker exec fleetmon-postgres pg_dump -U fleetmon fleetmon > /tmp/prod.sql
+#   docker exec -i fleetmon-ai-postgres psql -U fleetmon fleetmon < /tmp/prod.sql
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fleetmon-ai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fleetmon
+      POSTGRES_USER: fleetmon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fleetmon_dev_pw}
+    ports:
+      - "5532:5432"
+    volumes:
+      - postgres_ai_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fleetmon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fleetmon-ai-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    ports:
+      - "6479:6379"
+    volumes:
+      - redis_ai_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fleetmon-ai-backend
+    restart: unless-stopped
+    ports:
+      - "8100:8000"
+    networks:
+      - default
+      - prod
+    environment:
+      # Point at the PROD database (single source of truth). The AI stack has no
+      # collector worker of its own, so reading its own empty DB made everything
+      # show Offline. PROD's worker keeps this data live for all 274 servers.
+      DATABASE_URL: postgresql+asyncpg://fleetmon:fleetmon_amd_2026@fleetmon-postgres:5432/fleetmon
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      DEBUG: ${DEBUG:-false}
+      ALLOWED_ORIGINS: '["http://localhost:3100","http://10.194.168.138:3100"]'
+      # ── AI / GPT-oss-20B ──────────────────────────────────────────────
+      AI_ENABLED: ${AI_ENABLED:-true}
+      AI_BASE_URL: ${AI_BASE_URL:-https://llm-api.amd.com/api/v1}
+      AI_MODEL: ${AI_MODEL:-Claude-Opus-4.6}
+      AI_SUBSCRIPTION_KEY: ${AI_SUBSCRIPTION_KEY:-}
+      AI_TIMEOUT: ${AI_TIMEOUT:-90}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-8000}
+      AI_TEMPERATURE: ${AI_TEMPERATURE:-0.2}
+      # PRISM / PIPT (read-only enrich, same as prod)
+      PRISM_ENABLED: ${PRISM_ENABLED:-false}
+      PRISM_URL: ${PRISM_URL:-https://prism.amd.com/os-provisioning-api}
+      PRISM_USER: ${PRISM_USER:-}
+      PRISM_PASSWORD: ${PRISM_PASSWORD:-}
+      PRISM_API_KEY: ${PRISM_API_KEY:-}
+      PIPT_ENABLED: ${PIPT_ENABLED:-false}
+      PIPT_URL: ${PIPT_URL:-http://tsp-dogmatix-blr.amd.com:8787}
+      BIOS_API_URL: ${BIOS_API_URL:-http://10.194.168.138:5005}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${AI_API_URL:-http://10.194.168.138:8100}
+    container_name: fleetmon-ai-frontend
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: ${AI_API_URL:-http://10.194.168.138:8100}
+
+volumes:
+  postgres_ai_data:
+  redis_ai_data:
+
+networks:
+  default:
+    name: fleetmon-ai-network
+  prod:
+    name: fleetmon-network
+    external: true
