@@ -1,0 +1,71 @@
+# Dependencies
+frontend/node_modules/
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Build outputs
+frontend/.next/
+frontend/out/
+backend/.pytest_cache/
+backend/htmlcov/
+*.egg-info/
+
+# Environment — NEVER commit secrets
+.env
+.env.rbac
+.env.local
+.env.production
+**/.env
+
+# Keep examples
+!.env.example
+
+# Database / data
+*.sqlite
+*.db
+deploy/postgres/data/
+deploy/nginx/certs/
+*.pem
+*.key
+*.crt
+
+# Logs
+*.log
+logs/
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Docker volumes (never commit data)
+postgres_data/
+redis_data/
+vm_data/
+grafana_data/
+postgres_rbac_data/
+redis_rbac_data/
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+.mypy_cache/
+.ruff_cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Claude Code
+.claude/worktrees/
