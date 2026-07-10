@@ -58,6 +58,44 @@ Filterable by Team, Family, Turin Variant, and BIOS Version.
 
 ---
 
+## Live NOC — Live Operations Center
+
+![Live NOC](docs/screenshots/live-noc.png)
+
+The **AMD NOC** page is a real-time operations center with genuine sensor readings, auto-refreshing every 5 seconds. It gives NOC engineers an instant full-fleet situational view.
+
+**Live Fleet Summary (snapshot: 11:45:38, Fri Jul 10):**
+
+| Metric | Value |
+|---|---|
+| Total Servers | 274 |
+| Healthy | 213 |
+| Warning | 17 |
+| Critical | 17 |
+| Offline | 11 |
+| Avg CPU Temp | 42 °C |
+| Max CPU Temp | 82.125 °C |
+| Fleet Power | 17 kW |
+| BMC Critical | 6 servers |
+
+**Active Critical Alerts (40)** are shown in a live feed with timestamps:
+- PSU Failure — 1 PSU(s) failed on `smc2890-ipmi`. Redundancy lost. *(8 min ago)*
+- Server Offline / BMC Unreachable — `cinnabar-3ee2` *(~1 hr ago)*
+- Server Offline / BMC Unreachable — `cinnabar-30bb` *(~1 hr ago)*
+
+**Problem Servers (24)** table lists every critical/warning server with per-server telemetry:
+
+| Server | Status | Health | CPU Temp | Power | Sensor |
+|---|---|---|---|---|---|
+| idrac-jpn43w2 | Critical | 86 | — | — | — |
+| titanite-d33e | Critical | 88 | 75.625 °C | 496W | Critical |
+| titanite-d2e6 | Critical | 92 | 46.75 °C | 60W | Critical |
+| titanite-d4c0 | Critical | 92 | 66.5 °C | 61W | Critical |
+
+Columns: Server · Status · Health Score · CPU Temp · Inlet Temp · Power · PSU Fail · Fan Fail · Sensor status. Exportable via the **Export** button.
+
+---
+
 ## Ask Helios — AI Operations Assistant
 
 ![Ask Helios](docs/screenshots/ask-helios.png)
