@@ -137,11 +137,121 @@ Helios autonomously:
 - RBAC with role-based access (Admin, NOC, User)
 - Changelog and audit trail
 
+---
+
+## Getting Started
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) v2+
+- Git
+- An `ANTHROPIC_API_KEY` for the Ask Helios AI assistant
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Dudekulabasha03/Server_monitor.git
+cd Server_monitor
+```
+
+### 2. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and fill in the required values:
+
+| Variable | Description |
+|---|---|
+| `SECRET_KEY` | Random secret for JWT signing (use `openssl rand -hex 32`) |
+| `POSTGRES_PASSWORD` | Password for the PostgreSQL database |
+| `ANTHROPIC_API_KEY` | API key for Ask Helios (Claude AI) |
+| `DEFAULT_BMC_USERNAME` | Default BMC/iDRAC username for server polling |
+| `DEFAULT_BMC_PASSWORD` | Default BMC/iDRAC password for server polling |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` | Email alert settings (optional) |
+| `TEAMS_WEBHOOK_URL` | MS Teams alert webhook (optional) |
+| `PRISM_URL` / `PRISM_USER` / `PRISM_PASSWORD` | PRISM OS-provisioning API (optional) |
+| `BIOS_API_URL` | BIOS flash API endpoint (optional) |
+
+### 3. Start the full stack
+
+```bash
+docker compose up -d
+```
+
+This starts all services:
+
+| Service | Port | Description |
+|---|---|---|
+| Frontend (Next.js) | `3000` | Main UI |
+| Backend API (FastAPI) | `8000` | REST API |
+| PostgreSQL | `5432` | Primary database |
+| Redis | `6379` | Cache + task queue |
+| VictoriaMetrics | `8428` | Time-series metrics |
+| Grafana | `3001` | Raw metric exploration |
+| Nginx | `80` / `443` | Reverse proxy |
+
+### 4. Open the app
+
+```
+http://localhost:3000
+```
+
+Default login is created on first run. Check the backend logs for the initial admin credentials:
+
+```bash
+docker compose logs backend | grep "admin"
+```
+
+---
+
+### Optional: Run with RBAC (Enterprise Auth)
+
+For role-based access control with JWT authentication (Admin / NOC / User roles):
+
+```bash
+cp .env.rbac .env
+docker compose -f docker-compose.rbac.yml up -d
+```
+
+The RBAC stack runs on separate ports:
+
+| Service | Port |
+|---|---|
+| Frontend (RBAC) | `3200` |
+| Backend API (RBAC) | `8200` |
+
+---
+
+### Useful commands
+
+```bash
+# View logs
+docker compose logs -f backend
+docker compose logs -f worker
+
+# Stop all services
+docker compose down
+
+# Stop and wipe all data volumes
+docker compose down -v
+
+# Rebuild after code changes
+docker compose up -d --build
+```
+
+---
+
 ## Tech Stack
 
-- **Backend:** Python / FastAPI
-- **Frontend:** Next.js / TypeScript
-- **Database:** MongoDB
-- **Task Queue:** Celery + Redis
-- **Deployment:** Docker Compose
-- **BMC Protocol:** Redfish (OpenBMC / HPE iLO)
+| Layer | Technology |
+|---|---|
+| Backend | Python 3.12 · FastAPI · SQLAlchemy |
+| Frontend | Next.js 14 · TypeScript · Tailwind CSS |
+| Database | PostgreSQL 16 |
+| Time-Series | VictoriaMetrics |
+| Task Queue | Celery + Redis |
+| AI Assistant | Claude Opus 4.6 (Anthropic) |
+| Deployment | Docker Compose · Nginx |
+| BMC Protocol | Redfish (OpenBMC / HPE iLO) |
