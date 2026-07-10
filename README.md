@@ -58,6 +58,37 @@ Filterable by Team, Family, Turin Variant, and BIOS Version.
 
 ---
 
+## Ask Helios — AI Operations Assistant
+
+![Ask Helios](docs/screenshots/ask-helios.png)
+
+**Ask Helios** is a natural-language AI assistant powered by **Claude Opus 4.6 (Live)** that reasons step-by-step over live fleet data — read-only and grounded in real tool data, never hallucinating.
+
+**Example interaction shown:** *"Can you test Samsung disk on a Turin system?"*
+
+Helios autonomously:
+1. Located a Turin server (`volcano-9a44`) with a Samsung NVMe disk
+2. Identified the correct data disk (`/dev/nvme1n1` — Samsung MZWLO3T8HCLS-00A07, 3.5 TB NVMe) and excluded the OS disk
+3. Ran FIO benchmark and returned structured results
+
+**Disk Inventory surfaced by Helios (volcano-9a44):**
+
+| Device | Model | Capacity | Health | Role |
+|---|---|---|---|---|
+| /dev/nvme0n1 | SAMSUNG MZVL2512HCJQ-00B00 | 477 GB | OK | OS disk (excluded) |
+| /dev/nvme1n1 | SAMSUNG MZWLO3T8HCLS-00A07 | 3.5 TB | OK | **Tested** |
+| /dev/nvme2n1 | SAMSUNG MZWLO3T8HCLS-00A07 | 3.5 TB | OK | Data |
+| /dev/nvme3n1 | SAMSUNG MZWLO3T8HCLS-00A07 | 3.5 TB | OK | Data |
+| /dev/nvme4n1 | SAMSUNG MZWLO3T8HCLS-00A07 | 3.5 TB | OK | Data |
+
+**Capabilities:**
+- Natural language queries over live server telemetry
+- Autonomous tool use: disk inventory, FIO benchmarks, BIOS checks, alert lookups
+- Batch operations via attached server lists
+- Fully read-only — no unintended mutations
+
+---
+
 ## Features
 
 - Live fleet health dashboard with real-time telemetry
